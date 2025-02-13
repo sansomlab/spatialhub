@@ -1,3 +1,8 @@
+# Pipeline built directory and cache
+spatialhub.egg-info/
+__pycache__/
+.DS_Store
+
 # History files
 .Rhistory
 .Rapp.history

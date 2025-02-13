@@ -1,0 +1,43 @@
+# cgat-core requirements (on BMRC: install using git branch e033b36)
+apsw
+gevent
+numpy
+pandas
+paramiko
+pep8
+pytest
+pytest-pep8
+drmaa
+pyyaml
+ruffus
+six
+sqlalchemy
+setuptools
+Cython
+pysam
+cgatcore
+cgatcore.iotools
+
+# spatial pipeline requirements
+tifffile
+imagecodecs
+
+
+### DRAFT requirements TBC ###
+
+packaging
+notebook
+'scanpy[leiden]'
+torch
+tf-keras
+scvi-tools
+harmonypy
+scikit-misc
+sccoda
+'spatialdata[extra]'
+squidpy
+tiffslide_xarray
+'cellpose[gui]'
+'scikit-image[optional]'
+patchify
+'sopa[cellpose,baysor]'
