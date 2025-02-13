@@ -141,7 +141,6 @@ class setup():
             # self.var["infile"] = self.infile
             
             self.indir = os.path.dirname(infile) 
-            
             self.inname = os.path.basename(infile)
 
         if make_outdir:

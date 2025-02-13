@@ -22,6 +22,8 @@ parser.add_argument("--projDir", default="None", type=str,
                     help="path to the project directory")
 parser.add_argument("--slideName", default="None", type=str,
                     help="`basename` of the CosMx slide used for directory and file naming")
+parser.add_argument("--fov2sample", default="samples.tsv", type=str,
+                    help="path to the spatialhub samples TSV table")
 
 args = parser.parse_args()
 
@@ -29,21 +31,20 @@ args = parser.parse_args()
 ### SETUP ###
 
 path2tiff = f"{args.projDir}/data/raw/{args.slideName}/Morphology2D/"
-path2meta = f"{args.projDir}/metadata/{args.slideName}_fov2sample.csv"
+path2meta = f"{args.fov2sample}"
 outDir = f"{args.projDir}/data/grouped/{args.slideName}/"
 
 os.makedirs(outDir, exist_ok=True)
-os.makedirs(os.path.join(outDir, "fov2sample.dir"), exist_ok=True)
 os.makedirs(os.path.join(outDir, "Morphology2D"), exist_ok=True)
-
-# Read in metadata file
-df = pd.read_csv(path2meta)
-if "sample_name" not in df.columns:
-    print("'sample_name' not found: setting it to 'sample_id'")
-    df["sample_name"] = df["sample_id"]
 
 # Define path to each TIFF file
 tif_files = glob.glob(os.path.join(path2tiff, "*.TIF"))
+
+# Read in metadata file
+df = pd.read_csv(path2meta, sep = "\t")
+if "sample_name" not in df.columns:
+    print("'sample_name' not found: setting it to 'sample_id'")
+    df["sample_name"] = df["sample_id"]
 
 
 ### TASKS ###
@@ -78,7 +79,7 @@ f0 = Path(os.path.basename(tif_files[0])).stem  # extract basename without file 
 for sample in list(set(df["sample_name"])):
     print(sample)
     fov_pattern = list(set(df["fov_sequence"][df["sample_name"] == sample]))[0]
-    fov_pattern = fov_pattern.split(";")
+    fov_pattern = fov_pattern.split(",")
     
     # Set tif_files object to the list of TIFF files for the corresponding sample
     sample_directory = os.path.join(outDir, "Morphology2D", sample)

@@ -1,4 +1,4 @@
 
 # Path to project, and naming conventions
+sample_table: /users/sansom/tme871/work/kir032_morrell_cosmx_cancer/shared/cosmx/metadata/HNSCC_spatialhub_samples.tsv
 projDir: /users/sansom/tme871/work/kir032_morrell_cosmx_cancer/shared/cosmx/
-slideName: HNSCC_run1

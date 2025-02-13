@@ -93,6 +93,7 @@ import cgatcore.iotools as IOTools
 
 # import local pipeline utility functions
 import spatialhub.tasks as T
+import spatialhub.tasks.samples as samples
 
 
 # ----------------------- < pipeline configuration > ------------------------ #
@@ -117,42 +118,53 @@ if len(sys.argv) > 1:
 # TBC
 
 
+# ----------------------- Read in the samples set -------------------------- #
+
+#runAshlar = False  # This may become handy when expanding pipeline to other technologies where stitching is not required
+
+# Only do this when pipeline tasks are being executed.
+if len(sys.argv) > 1:
+    if sys.argv[1] == "make":
+        
+        S = samples.samples(sample_tsv = PARAMS["sample_table"])
+
+        #if any([x in ["cosmx"] 
+        #        for x in S.technology]): 
+        #    runAshlar = True
+
+
 # ----------------------------- Pipeline tasks ----------------------------- #
 
-@follows(mkdir("ashlar.dir"))
-@files(None, "ashlar.dir/ashlar_setup.sentinel")
+#@active_if(runAshlar)
+def slide_jobs():
+     
+    if not os.path.exists("ashlar.dir"):
+        os.mkdir("ashlar.dir")
+
+    for slide in S.slide_ids():
+        slide_path = os.path.join("ashlar.dir", slide + ".tsv")
+        S.write_tsv("slide_id", slide, slide_path)
+        sentinel_file = os.path.join("ashlar.dir", slide + ".sentinel")
+        yield([slide_path, sentinel_file])
+
+
+@files(slide_jobs)
 def ashlarSetup(infile, outfile):
     '''
-    Copies original FOV files into one separate sub-directory per sample
+    Copies original FOV files into one separate sub-directory per sample per slide
     '''
 
     t = T.setup(infile, outfile, PARAMS,
                 memory=4,
                 cpu=1)
+    
+    input_slide = os.path.basename(infile)[:-len(".tsv")]
+    sample_tsv = PARAMS["sample_table"]
     
     statement = '''python %(spatialhub_code_dir)s/python/ashlar_setup.py 
                    --projDir=%(projDir)s
-                   --slideName=%(slideName)s
-                   &> %(log_file)s
-                ''' % dict(PARAMS, **t.var, **locals())
-    
-    P.run(statement, **t.resources)
-    IOTools.touch_file(outfile)
-
-@follows(ashlarSetup)
-@files(None, "ashlar.dir/ashlar_rename.sentinel")
-def ashlarRename(infile, outfile):
-    '''
-    Renames FOV files and inserts mock tiles where needed for Ashlar stitching
-    '''
-
-    t = T.setup(infile, outfile, PARAMS,
-                memory=4,
-                cpu=1)
-    
-    statement = '''python %(spatialhub_code_dir)s/python/ashlar_rename_tiles.py 
-                   --projDir=%(projDir)s
-                   --slideName=%(slideName)s
+                   --slideName=%(input_slide)s
+                   --fov2sample=%(sample_table)s
                    &> %(log_file)s
                 ''' % dict(PARAMS, **t.var, **locals())
     
@@ -162,7 +174,7 @@ def ashlarRename(infile, outfile):
 
 # --------------------- < generic pipeline tasks > -------------------------- #
 
-@follows(ashlarRename)
+@follows(ashlarSetup)
 def full():
     pass
 
