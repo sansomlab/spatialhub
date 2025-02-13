@@ -172,9 +172,75 @@ def ashlarSetup(infile, outfile):
     IOTools.touch_file(outfile)
 
 
+@follows(slide_jobs, ashlarSetup)
+@files(slide_jobs)
+def ashlarRename(infile, outfile):
+    '''
+    Renames FOV files and inserts mock tiles where needed for Ashlar stitching
+    '''
+
+    t = T.setup(infile, outfile, PARAMS,
+                memory=4,
+                cpu=1)
+    
+    input_slide = os.path.basename(infile)[:-len(".tsv")]
+    sample_tsv = PARAMS["sample_table"]
+    
+    statement = '''python %(spatialhub_code_dir)s/python/ashlar_rename_tiles.py 
+                   --projDir=%(projDir)s
+                   --slideName=%(input_slide)s
+                   --fov2sample=%(sample_table)s
+                   &> %(log_file)s
+                ''' % dict(PARAMS, **t.var, **locals())
+    
+    P.run(statement, **t.resources)
+    IOTools.touch_file(outfile)
+
+
+# Now we've organised the data directory => Moving on to Ashlar stitching per se
+
+# WARNING: Somehow we need to capture information about the sample name and slide!! 
+
+def sample_jobs():
+     
+    if not os.path.exists("ashlar.dir"):
+        os.mkdir("ashlar.dir")
+
+    for sample in S.sample_ids():
+        sample_path = os.path.join("ashlar.dir", sample + ".tsv")
+        S.write_tsv("sample_id", sample, sample_path)
+        sentinel_file = os.path.join("ashlar.dir", sample + ".sentinel")
+        yield([sample_path, sentinel_file])
+
+
+@follows(sample_jobs, ashlarRename)
+@files(sample_jobs)
+def ashlarStitch(infile, outfile):
+    '''
+    Stitches FOV files into one whole microscopy image
+    '''
+
+    t = T.setup(infile, outfile, PARAMS,
+                memory=4,
+                cpu=1)
+    
+    input_sample = os.path.basename(infile)[:-len(".tsv")]
+    sample_tsv = PARAMS["sample_table"]
+    
+    statement = '''python %(spatialhub_code_dir)s/python/ashlar_sitch_cosmx.py 
+                   --projDir=%(projDir)s
+                   --sampleName=%(input_sample)s
+                   --fov2sample=%(sample_table)s
+                   &> %(log_file)s
+                ''' % dict(PARAMS, **t.var, **locals())
+    
+    P.run(statement, **t.resources)
+    IOTools.touch_file(outfile)
+
+
 # --------------------- < generic pipeline tasks > -------------------------- #
 
-@follows(ashlarSetup)
+@follows(ashlarRename)
 def full():
     pass
 

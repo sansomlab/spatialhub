@@ -46,6 +46,9 @@ if "sample_name" not in df.columns:
     print("'sample_name' not found: setting it to 'sample_id'")
     df["sample_name"] = df["sample_id"]
 
+# Subset to slide of interest
+df = df[df["slide_id"] == args.slideName]
+
 
 ### TASKS ###
 
