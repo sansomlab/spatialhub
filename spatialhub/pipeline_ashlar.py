@@ -172,34 +172,7 @@ def ashlarSetup(infile, outfile):
     IOTools.touch_file(outfile)
 
 
-@follows(slide_jobs, ashlarSetup)
-@files(slide_jobs)
-def ashlarRename(infile, outfile):
-    '''
-    Renames FOV files and inserts mock tiles where needed for Ashlar stitching
-    '''
-
-    t = T.setup(infile, outfile, PARAMS,
-                memory=4,
-                cpu=1)
-    
-    input_slide = os.path.basename(infile)[:-len(".tsv")]
-    sample_tsv = PARAMS["sample_table"]
-    
-    statement = '''python %(spatialhub_code_dir)s/python/ashlar_rename_tiles.py 
-                   --projDir=%(projDir)s
-                   --slideName=%(input_slide)s
-                   --fov2sample=%(sample_table)s
-                   &> %(log_file)s
-                ''' % dict(PARAMS, **t.var, **locals())
-    
-    P.run(statement, **t.resources)
-    IOTools.touch_file(outfile)
-
-
-# Now we've organised the data directory => Moving on to Ashlar stitching per se
-
-# WARNING: Somehow we need to capture information about the sample name and slide!! 
+# Now that we've split the dataset per sample, we can operate at this level
 
 def sample_jobs():
      
@@ -213,11 +186,12 @@ def sample_jobs():
         yield([sample_path, sentinel_file])
 
 
-@follows(sample_jobs, ashlarRename)
+@follows(sample_jobs, ashlarSetup)
+#@transform(ashlarSetup, suffix(".sentinel"), ".setup")
 @files(sample_jobs)
-def ashlarStitch(infile, outfile):
+def ashlarRename(infile, outfile):
     '''
-    Stitches FOV files into one whole microscopy image
+    Renames FOV files and inserts mock tiles where needed for Ashlar stitching
     '''
 
     t = T.setup(infile, outfile, PARAMS,
@@ -227,10 +201,69 @@ def ashlarStitch(infile, outfile):
     input_sample = os.path.basename(infile)[:-len(".tsv")]
     sample_tsv = PARAMS["sample_table"]
     
-    statement = '''python %(spatialhub_code_dir)s/python/ashlar_sitch_cosmx.py 
+    statement = '''python %(spatialhub_code_dir)s/python/ashlar_rename_tiles.py 
                    --projDir=%(projDir)s
-                   --sampleName=%(input_sample)s
+                   --sampleKey=%(input_sample)s
                    --fov2sample=%(sample_table)s
+                   &> %(log_file)s
+                ''' % dict(PARAMS, **t.var, **locals())
+    
+    P.run(statement, **t.resources)
+    IOTools.touch_file(outfile)
+
+
+@follows(sample_jobs, ashlarRename)
+#@transform(ashlarRename, suffix(".sentinel"), ".rename")
+@files(sample_jobs)
+def ashlarStitch(infile, outfile):
+    '''
+    Stitches FOV files from each sample into one whole microscopy image
+    '''
+
+    t = T.setup(infile, outfile, PARAMS,
+                memory=4,
+                cpu=1)
+    
+    input_sample = os.path.basename(infile)[:-len(".tsv")]
+    sample_tsv = PARAMS["sample_table"]
+    px_size = PARAMS["ashlar_pixel_size"]
+    tile_ovlp = PARAMS["ashlar_tile_overlap"]
+    keep_channels = PARAMS["ashlar_keep_channels"]
+    
+    statement = '''python %(spatialhub_code_dir)s/python/ashlar_stitch_cosmx.py 
+                   --projDir=%(projDir)s
+                   --sampleKey=%(input_sample)s
+                   --fov2sample=%(sample_table)s
+                   --pxSize=%(px_size)s
+                   --tileOvlp=%(tile_ovlp)s
+                   --keepChannels=%(keep_channels)s
+                   &> %(log_file)s
+                ''' % dict(PARAMS, **t.var, **locals())
+    
+    P.run(statement, **t.resources)
+    IOTools.touch_file(outfile)
+
+
+@follows(sample_jobs, ashlarStitch)
+@files(sample_jobs)
+def ashlarConvertCoords(infile, outfile):
+    '''
+    Convert original transcripts coordinates into new coordinate system for each sample
+    '''
+
+    t = T.setup(infile, outfile, PARAMS,
+                memory=32,
+                cpu=1)
+    
+    input_sample = os.path.basename(infile)[:-len(".tsv")]
+    sample_tsv = PARAMS["sample_table"]
+    px_size = PARAMS["ashlar_pixel_size"]
+    
+    statement = '''Rscript %(spatialhub_code_dir)s/R/ashlar_convert_coords.R
+                   --projDir=%(projDir)s
+                   --sampleKey=%(input_sample)s
+                   --fov2sample=%(sample_table)s
+                   --pxSize=%(px_size)s
                    &> %(log_file)s
                 ''' % dict(PARAMS, **t.var, **locals())
     
@@ -240,7 +273,7 @@ def ashlarStitch(infile, outfile):
 
 # --------------------- < generic pipeline tasks > -------------------------- #
 
-@follows(ashlarRename)
+@follows(ashlarConvertCoords)
 def full():
     pass
 

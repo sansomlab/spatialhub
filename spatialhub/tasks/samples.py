@@ -73,9 +73,9 @@ class samples():
         #             self.known_technology)
         
         # Check for uniqueness of sample names per slide
-        x = samples["sample_id"].astype(str) + "_" + samples["slide_id"].astype(str)
+        x = samples["sample_id"].astype(str) #+ "_" + samples["slide_id"].astype(str)
         if not x.is_unique:
-            raise ValueError("Repeated sample_ids within the same slide for at least one slide_id.")
+            raise ValueError("Repeated sample_ids, Please make sure these are unique (to identify same samples across different slides, use sample_name).")
         
         samples.index = x
         self.samples = samples.to_dict(orient="index")
@@ -99,7 +99,14 @@ class samples():
     
     def write_tsv(self, group, group_key, outfile_path):
         '''
-        Returns a mock input TSV file per group (slide, sample, batch...) to iterate a task of the pipeline on
+        Returns a mock input TSV file per group (slide, sample, batch, etc...) to iterate a task of the pipeline on
         '''
         group_df = pd.DataFrame({group: group_key}, index = [0])
-        group_df.to_csv(outfile_path, index = False, sep = "\t")        
+        group_df.to_csv(outfile_path, index = False, sep = "\t")
+
+#    def write_sample(self, outfile_path):
+#        '''
+#        Returns an input TSV file per sample_id, with matching variables to be used as input for the pipeline task
+#        '''
+#        group_df = pd.DataFrame({group: group_key}, index = [0])
+#        group_df.to_csv(outfile_path, index = False, sep = "\t")        

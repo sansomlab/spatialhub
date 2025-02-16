@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--projDir", default="None", type=str,
                     help="path to the project directory")
 parser.add_argument("--slideName", default="None", type=str,
-                    help="`basename` of the CosMx slide used for directory and file naming")
+                    help="Name of the CosMx slide used for directory and file naming")
 parser.add_argument("--fov2sample", default="samples.tsv", type=str,
                     help="path to the spatialhub samples TSV table")
 
@@ -89,16 +89,21 @@ for index, row in df.iterrows():
     destination_directory = os.path.join(outDir, "Morphology2D", sample)
     os.makedirs(destination_directory, exist_ok=True)
 
-    # Extract file names ending with "00{tif_number}.TIF" in source tiff directory
-    regex_pattern = f"00{tif_number}\\.TIF$" 
-    matching_files = [file for file in tif_files if re.search(regex_pattern, os.path.basename(file))]
-    if matching_files:
-        if len(matching_files) > 1:
-            print(f"ERROR: Several matching TIFF files for FOV {tif_number}")
-        else:
-            source_file = matching_files[0]
-            shutil.copy(source_file, destination_directory)
+    if len(os.listdir(destination_directory)) > 0:
+        print(f"WARNING: Some TIFF files are already present in the sample-specific directory. Skipping copy operation for {sample}.")
+    
     else:
-        print(f"ERROR: File matching pattern '00{tif_number}.TIF' not found in {path2tiff}.")
+        # Extract file names ending with "00{tif_number}.TIF" in source tiff directory
+        regex_pattern = f"00{tif_number}\\.TIF$" 
+        matching_files = [file for file in tif_files if re.search(regex_pattern, os.path.basename(file))]
+        if matching_files:
+            if len(matching_files) > 1:
+               print(f"ERROR: Several matching TIFF files for FOV {tif_number}")
+            else:
+                source_file = matching_files[0]
+                shutil.copy(source_file, destination_directory)
+        else:
+            print(f"ERROR: File matching pattern '00{tif_number}.TIF' not found in {path2tiff}.")
+
 
 print("FOV files copy operation complete.")

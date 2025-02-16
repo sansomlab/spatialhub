@@ -1,4 +1,40 @@
+#
+# Pipeline pipeline_ashlar.py configuration file
+# ==================================================
+#
 
-# Path to project, and naming conventions
-sample_table: /users/sansom/tme871/work/kir032_morrell_cosmx_cancer/shared/cosmx/metadata/HNSCC_spatialhub_samples.tsv
+# General options
+# ---------------
+
+# Path to project directory, 
+# within which we expect a `./data/raw` sub-directory, 
+# and where the re-organized `.data/grouped` sub-directory will be created
 projDir: /users/sansom/tme871/work/kir032_morrell_cosmx_cancer/shared/cosmx/
+
+# Location of the samples.tsv table
+# including notably fov to sample conversion information 
+# Importantly, the slide_id must match the name of the directory used to save raw Morphology2D data
+# (see documentation for details)
+sample_table: /users/sansom/tme871/work/kir032_morrell_cosmx_cancer/shared/cosmx/metadata/HNSCC_spatialhub_samples.tsv
+
+
+# General Ashlar stitching options
+# ---------------
+
+# NOTE: default parameters are for a CosMx slide (up-to-date as of February 2025)
+ashlar:
+
+    # Pixel to micrometer size factor
+    pixel_size: 0.120280945
+
+    # Overlap between adjacent FOV tiles
+    tile_overlap: 0.01
+
+    # Comma separated list of FOV channels to keep in 3-channel image saving mode 
+    # (useful to open files in Cellpose GUI)
+    # Use *numbers* for now (need to add functionality to parse Channel Dictionary)
+    # Default PanCk, Membrane, DNA
+    keep_channels: 0,2,4
+
+    # < Add option to simplify the transcripts file or not >
+
