@@ -18,8 +18,6 @@ from tifffile import imread, imwrite
 print("Parsing arguments")
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--projDir", default="None", type=str,
-                    help="path to the project directory")
 parser.add_argument("--sampleKey", default="None", type=str,
                     help="unique sample_id as in samples.tsv file, referring to the sample to execute the script on")
 parser.add_argument("--fov2sample", default="samples.tsv", type=str,
@@ -46,7 +44,7 @@ slideName = list(set(df["slide_id"]))[0]
 sampleName = list(set(df["sample_name"]))[0]
 
 # Define path to data directories for corresponding sample
-path2tiff = f"{args.projDir}/data/grouped/{slideName}/Morphology2D/{sampleName}"
+path2tiff = f"ashlar.dir/{slideName}/Morphology2D/{sampleName}"
 assert os.path.exists(path2tiff), "Sample TIFF directory does not exist. Please run Ashlar setup first."
 
 # Define path to source TIFF files

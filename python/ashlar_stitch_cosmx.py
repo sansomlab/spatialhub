@@ -19,8 +19,6 @@ import glob
 print("Parsing arguments")
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--projDir", default="None", type=str,
-                    help="path to the project directory")
 parser.add_argument("--sampleKey", default="None", type=str,
                     help="unique sample_id as in samples.tsv file, referring to the sample to execute the script on")
 parser.add_argument("--fov2sample", default="samples.tsv", type=str,
@@ -58,6 +56,7 @@ if "sample_name" not in df.columns:
 # Subset to sample of interest
 df = df[df["sample_id"] == args.sampleKey]
 assert df.shape[0] == 1, "sample data frame can only have one single row"
+df.index = [0]
 print(df)
 slideName = list(set(df["slide_id"]))[0]
 sampleName = list(set(df["sample_name"]))[0]
@@ -67,14 +66,14 @@ fov_width = list(set(df["fov_width"]))[0]
 fov_height = list(set(df["fov_height"]))[0]
 
 # Define path to data directories for corresponding sample
-path2tiff = f"{args.projDir}/data/grouped/{slideName}/Morphology2D/{sampleName}"
+path2tiff = f"ashlar.dir/{slideName}/Morphology2D/{sampleName}"
 assert os.path.exists(path2tiff), "Sample TIFF directory does not exist. Please run Ashlar setup first."
 
 # Define path to source TIFF files
 tif_files = glob.glob(os.path.join(path2tiff, "*.TIF"))
 
 # Define and make directory to output stitched images
-outDir = f"{args.projDir}/data/grouped/{slideName}/stitched.dir"
+outDir = f"ashlar.dir/{slideName}/Stitched2D"
 os.makedirs(outDir, exist_ok=True)
 
 

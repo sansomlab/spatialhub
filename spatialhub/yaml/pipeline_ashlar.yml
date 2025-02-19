@@ -6,10 +6,10 @@
 # General options
 # ---------------
 
-# Path to project directory, 
-# within which we expect a `./data/raw` sub-directory, 
-# and where the re-organized `.data/grouped` sub-directory will be created
-projDir: /users/sansom/tme871/work/kir032_morrell_cosmx_cancer/shared/cosmx/
+# Path to project raw data directory, 
+# within which we expect one sub-directory per slide (each with sub-directories `Morphology2D` and `flatFiles`). 
+# The name of the slide sub-directory must match the (unique) slide_id specified in the samples.tsv file
+projDir: /users/sansom/tme871/work/kir032_morrell_cosmx_cancer/shared/cosmx/data/raw/
 
 # Location of the samples.tsv table
 # including notably fov to sample conversion information 

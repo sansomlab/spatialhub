@@ -20,7 +20,7 @@ stopifnot(
 option_list <- list(
     make_option(
         c("--projDir"),
-        help="path to the project directory"
+        help="path to the project directory containing raw data"
     ),
     make_option(
         c("--sampleKey"),
@@ -38,6 +38,7 @@ option_list <- list(
 )
 
 opt <- parse_args(OptionParser(option_list=option_list))
+set.seed(123456789)
 
 cat("Running with options:\n")
 print(opt)
@@ -47,26 +48,47 @@ print(opt)
 
 ### Read list of transcripts file
 
-readSampleTx <- function(txFile, fovs,
-                         simplify = TRUE) {  
+readSampleTx <- function(splitTxDir, slide, fovs,
+                         simplify = FALSE) {  
     
-    # takes a flat transcripts file from AtoMx as input
-    # returns a list of tx files, split by FOV
     # if simplify = TRUE (default), removes cell_ids from AtoMx segmentation mask
 
-    # Read in full transcripts file, and filter for FOVs of interest
-    tx_df <- read.csv(txFile)
-    tx_df <- tx_df |> 
-        dplyr::filter(fov %in% fovs)
-
-    if (simplify == TRUE) {
-        tx_df <- tx_df |> 
-            dplyr::select(-cell_ID, -cell, -CellComp) #|>
-            #dplyr::rename(CellComp_atomx = CellComp)
+    tx_ls <- list()
+    for (f in fovs) {
+    
+    # import FOV raw file
+    tx_file <- paste0(splitTxDir, "/", 
+                      slide, "_tx_FOV", f, ".csv")
+    
+    if(file.exists(tx_file)) { 
+      
+      tx <- read.csv(tx_file) 
+      
+      # keep atomx cell index, to enable matching dataset if desired
+      tx$atomx_index <- paste0("FOV", tx$fov, "_C", tx$cell_ID)
+      #head(tx)
+      
+      # OPTIONAL: exclude negative/control probes
+      tx <- tx |> #[, grep("Negative|SystemControl", colnames(tx), invert = TRUE)] |> 
+        dplyr::select(-fov, -cell_ID, -cell) |>
+        dplyr::rename(atomx_CellComp = CellComp)
+      
+      if (simplify == TRUE) {
+        tx <- tx |> 
+            dplyr::select(-atomx_index, -atomx_CellComp)
+      }
+      
+      tx_ls[[paste0("FOV", f)]] <- tx
+      
+    } else {
+      
+      print(paste0("WARNING: No data for FOV", f))
+      
     }
+    
+  }
 
-    tx_ls <- split.data.frame(tx_df, f = tx_df$fov)
-    tx_ls
+  tx_ls
 
 }
 
@@ -79,7 +101,7 @@ convertCoordsAshlar <- function(tx_ls, ashlar_df,
     # takes a list of transcripts files corresponding to one sample
     # returns a per-sample dataframe with corrected coordinates
   
-    ashlar_df$FOV <- as.character(ashlar_df$FOV)
+    ashlar_df$FOV <- paste0("FOV", as.character(ashlar_df$FOV))
   
     for (f in names(tx_ls)) {
         
@@ -130,24 +152,25 @@ fovs <- unlist(strsplit(df$fov_sequence, ","))
 fovs <- as.integer(sort(fovs[fovs != "blank"]))
 
 # f"{args.projDir}/data/grouped/{slideName}/ashlar.dir"
-ashlarDir <- paste(opt$projDir, "data/grouped",
-                   slideName, "stitched.dir", 
+ashlarDir <- paste("ashlar.dir", 
+                   slideName, "Stitched2D", 
                    sep = "/")
 stopifnot(dir.exists(ashlarDir))
 
-# Define path to original AtoMx transcripts file
-path2tx <- paste(opt$projDir, "data/raw",
-                 slideName, "flatFiles", 
+# Define path to split AtoMx transcripts file
+path2tx <- paste(opt$projDir,
+                 slideName, "flatFiles", "split_txFile",
                  sep = "/")
-fileList <- list.files(path2tx, full.names = TRUE) 
-idx <- grep("_tx_file.csv.gz$", fileList)
-tx_file <- fileList[idx]
+#fileList <- list.files(path2tx, full.names = TRUE) 
+#idx <- grep("_tx_file.csv.gz$", fileList)
+#tx_file <- fileList[idx]
 
 
 # ---------- Tasks ----------
 
 # Import list of transcripts files for the necessary FOVs
-tx_ls <- readSampleTx(tx_file, fovs = fovs, simplify = TRUE)
+tx_ls <- readSampleTx(path2tx, slide = slideName, fovs = fovs, 
+                      simplify = FALSE)
 
 # Import original Ashlar coordinates file
 ashlarPath <- paste0(ashlarDir, "/", sampleName, "_ashlar_fov_positions.csv")
