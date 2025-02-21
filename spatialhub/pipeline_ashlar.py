@@ -117,7 +117,7 @@ if len(sys.argv) > 1:
 # ----------------------------- Pipeline tasks ----------------------------- #
 
 #@active_if(runAshlar)
-def slide_jobs():
+def split_jobs():
      
     if not os.path.exists("ashlar.dir"):
         os.mkdir("ashlar.dir")
@@ -134,21 +134,19 @@ def slide_jobs():
         if not os.path.isfile(slide_path):
             S.write_tsv("slide_id", slide, slide_path)
             
-        sentinel_file = os.path.join("ashlar.dir/logs", slide + ".sentinel")
+        sentinel_file = os.path.join("ashlar.dir/logs", slide + "_splitFlatFiles.sentinel")
         
         yield([slide_path, sentinel_file])
 
 
-@files(slide_jobs)
+@files(split_jobs)
 def splitFlatFiles(infile, outfile):
     '''
-    Splits large CosMx flat files by FOV (lower memory requirements)
+    Splits large CosMx flat files by FOV (significantly lowers downstream memory requirements)
     '''
 
-    outfile = outfile.replace(".sentinel", "_splitFlatFiles.sentinel")
-
     t = T.setup(infile, outfile, PARAMS,
-                memory=4,
+                memory=1,
                 cpu=1)
     
     input_slide = os.path.basename(infile)[:-len(".tsv")]
@@ -166,34 +164,17 @@ def splitFlatFiles(infile, outfile):
     IOTools.touch_file(outfile)
 
 
-@files(slide_jobs)
-def ashlarSetup(infile, outfile):
-    '''
-    Copies original FOV files into one separate sub-directory per sample per slide
-    '''
 
-    outfile = outfile.replace(".sentinel", "_ashlarSetup.sentinel")
-
-    t = T.setup(infile, outfile, PARAMS,
-                memory=4,
-                cpu=1)
-    
-    input_slide = os.path.basename(infile)[:-len(".tsv")]
-    
-    statement = '''python %(spatialhub_code_dir)s/python/ashlar_setup.py 
-                   --projDir=%(projDir)s
-                   --slideName=%(input_slide)s
-                   --fov2sample=%(sample_table)s
-                   &> %(log_file)s
-                ''' % dict(PARAMS, **t.var, **locals())
-    
-    P.run(statement, **t.resources)
-    IOTools.touch_file(outfile)
-
-
-# Now that we've split the dataset per sample, we can operate at this level
+# The follow-up tasks need to run at the sample-level.
 
 def sample_jobs():
+
+    if not os.path.exists("ashlar.dir"):
+        os.mkdir("ashlar.dir")
+    
+    if not os.path.exists("ashlar.dir/logs"):
+        os.mkdir("ashlar.dir/logs")
+
     
     for sample in S.sample_ids():
         
@@ -201,27 +182,25 @@ def sample_jobs():
         if not os.path.isfile(sample_path):
             S.write_tsv("sample_id", sample, sample_path)
         
-        sentinel_file = os.path.join("ashlar.dir/logs", sample + ".sentinel")
+        sentinel_file = os.path.join("ashlar.dir/logs", sample + "_ashlarSetup.sentinel")
 
         yield([sample_path, sentinel_file])
 
 
-@follows(sample_jobs, ashlarSetup)
 @files(sample_jobs)
-def ashlarRename(infile, outfile):
+def ashlarSetup(infile, outfile):
     '''
-    Renames FOV files and inserts mock tiles where needed for Ashlar stitching
+    Creates symlinks to original FOV files, grouped within one separate sub-directory per sample (per slide)
     '''
-
-    outfile = outfile.replace(".sentinel", "_ashlarRename.sentinel")
 
     t = T.setup(infile, outfile, PARAMS,
-                memory=4,
+                memory=1,
                 cpu=1)
     
     input_sample = os.path.basename(infile)[:-len(".tsv")]
     
-    statement = '''python %(spatialhub_code_dir)s/python/ashlar_rename_tiles.py
+    statement = '''python %(spatialhub_code_dir)s/python/ashlar_setup.py 
+                   --projDir=%(projDir)s
                    --sampleKey=%(input_sample)s
                    --fov2sample=%(sample_table)s
                    &> %(log_file)s
@@ -231,20 +210,19 @@ def ashlarRename(infile, outfile):
     IOTools.touch_file(outfile)
 
 
-@follows(sample_jobs, ashlarSetup, ashlarRename)
-@files(sample_jobs)
+@transform(ashlarSetup,
+           regex(r"(.*)/(.*)_ashlarSetup.sentinel"),
+           r"\1/\2_ashlarStitch.sentinel")
 def ashlarStitch(infile, outfile):
     '''
     Stitches FOV files from each sample into one whole microscopy image
     '''
 
-    outfile = outfile.replace(".sentinel", "_ashlarStitch.sentinel")
-
     t = T.setup(infile, outfile, PARAMS,
                 memory=4,
                 cpu=1)
     
-    input_sample = os.path.basename(infile)[:-len(".tsv")]
+    input_sample = os.path.basename(infile)[:-len("_ashlarSetup.sentinel")]
     px_size = PARAMS["ashlar_pixel_size"]
     tile_ovlp = PARAMS["ashlar_tile_overlap"]
     keep_channels = PARAMS["ashlar_keep_channels"]
@@ -262,20 +240,20 @@ def ashlarStitch(infile, outfile):
     IOTools.touch_file(outfile)
 
 
-@follows(sample_jobs, splitFlatFiles, ashlarSetup, ashlarRename, ashlarStitch)
-@files(sample_jobs)
+@follows(splitFlatFiles)
+@transform(ashlarStitch,
+           regex(r"(.*)/(.*)_ashlarStitch.sentinel"),
+           r"\1/\2_ashlarConvertCoords.sentinel")
 def ashlarConvertCoords(infile, outfile):
     '''
     Convert original transcripts coordinates into new coordinate system for each sample
     '''
 
-    outfile = outfile.replace(".sentinel", "_ashlarConvertCoords.sentinel")
-
     t = T.setup(infile, outfile, PARAMS,
-                memory=8,
+                memory=4,
                 cpu=1)
     
-    input_sample = os.path.basename(infile)[:-len(".tsv")]
+    input_sample = os.path.basename(infile)[:-len("_ashlarStitch.sentinel")]
     px_size = PARAMS["ashlar_pixel_size"]
     
     statement = '''Rscript %(spatialhub_code_dir)s/R/ashlar_convert_coords.R

@@ -54,6 +54,7 @@ if "sample_name" not in df.columns:
     df["sample_name"] = df["sample_id"]
 
 # Subset to sample of interest
+print(args.sampleKey)
 df = df[df["sample_id"] == args.sampleKey]
 assert df.shape[0] == 1, "sample data frame can only have one single row"
 df.index = [0]
@@ -66,7 +67,7 @@ fov_width = list(set(df["fov_width"]))[0]
 fov_height = list(set(df["fov_height"]))[0]
 
 # Define path to data directories for corresponding sample
-path2tiff = f"ashlar.dir/{slideName}/Morphology2D/{sampleName}"
+path2tiff = os.path.abspath(f"ashlar.dir/{slideName}/Morphology2D/{sampleName}")
 assert os.path.exists(path2tiff), "Sample TIFF directory does not exist. Please run Ashlar setup first."
 
 # Define path to source TIFF files
