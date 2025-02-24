@@ -38,3 +38,8 @@ ashlar:
 
     # < Add option to simplify the transcripts file or not >
 
+    # Allocated memory (in Gb)
+    low_mem: 1
+    med_mem: 4
+    high_mem: 8
+

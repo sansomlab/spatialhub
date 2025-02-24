@@ -128,15 +128,15 @@ def split_jobs():
 
     for slide in S.slide_ids():
         
-        slide_path = os.path.join("ashlar.dir", slide + ".tsv")
+        #slide_path = os.path.join("ashlar.dir", slide + ".tsv")
         
         # Add if statement to not overwrite date stamp when .tsv file already exists
-        if not os.path.isfile(slide_path):
-            S.write_tsv("slide_id", slide, slide_path)
+        #if not os.path.isfile(slide_path):
+        #    S.write_tsv("slide_id", slide, slide_path)
             
         sentinel_file = os.path.join("ashlar.dir/logs", slide + "_splitFlatFiles.sentinel")
         
-        yield([slide_path, sentinel_file])
+        yield([None, sentinel_file])
 
 
 @files(split_jobs)
@@ -145,11 +145,12 @@ def splitFlatFiles(infile, outfile):
     Splits large CosMx flat files by FOV (significantly lowers downstream memory requirements)
     '''
 
+    input_slide = os.path.basename(outfile)[:-len("_splitFlatFiles.sentinel")]
+
     t = T.setup(infile, outfile, PARAMS,
-                memory=1,
+                memory=PARAMS["ashlar_low_mem"],
                 cpu=1)
     
-    input_slide = os.path.basename(infile)[:-len(".tsv")]
     #pattern = "XYZ"  # if wanting to keep original name
     
     # WARNING: cosmx_setup.sh does not work if splitExprMat/splitTxFile directories are not empty.
@@ -178,13 +179,13 @@ def sample_jobs():
     
     for sample in S.sample_ids():
         
-        sample_path = os.path.join("ashlar.dir", sample + ".tsv")
-        if not os.path.isfile(sample_path):
-            S.write_tsv("sample_id", sample, sample_path)
+        #sample_path = os.path.join("ashlar.dir", sample + ".tsv")
+        #if not os.path.isfile(sample_path):
+        #    S.write_tsv("sample_id", sample, sample_path)
         
         sentinel_file = os.path.join("ashlar.dir/logs", sample + "_ashlarSetup.sentinel")
 
-        yield([sample_path, sentinel_file])
+        yield([None, sentinel_file])
 
 
 @files(sample_jobs)
@@ -193,11 +194,11 @@ def ashlarSetup(infile, outfile):
     Creates symlinks to original FOV files, grouped within one separate sub-directory per sample (per slide)
     '''
 
+    input_sample = os.path.basename(outfile)[:-len("_ashlarSetup.sentinel")]
+
     t = T.setup(infile, outfile, PARAMS,
-                memory=1,
+                memory=PARAMS["ashlar_low_mem"],
                 cpu=1)
-    
-    input_sample = os.path.basename(infile)[:-len(".tsv")]
     
     statement = '''python %(spatialhub_code_dir)s/python/ashlar_setup.py 
                    --projDir=%(projDir)s
@@ -219,7 +220,7 @@ def ashlarStitch(infile, outfile):
     '''
 
     t = T.setup(infile, outfile, PARAMS,
-                memory=4,
+                memory=PARAMS["ashlar_med_mem"],
                 cpu=1)
     
     input_sample = os.path.basename(infile)[:-len("_ashlarSetup.sentinel")]
@@ -250,7 +251,7 @@ def ashlarConvertCoords(infile, outfile):
     '''
 
     t = T.setup(infile, outfile, PARAMS,
-                memory=8,
+                memory=PARAMS["ashlar_high_mem"],
                 cpu=1)
     
     input_sample = os.path.basename(infile)[:-len("_ashlarStitch.sentinel")]

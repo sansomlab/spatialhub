@@ -82,7 +82,7 @@ os.makedirs(outDir, exist_ok=True)
 
 # Find pattern for series to stitch
 fov_files = os.listdir(path2tiff)
-assert len(fov_files) == fov_width * fov_height, "FOV grid incomplete. Please insert mock FOVs as placeholders to fill gaps."
+assert len(fov_files) == fov_width * fov_height, "Number of FOV files does not match image dimensions. Please check samples.tsv file."
 
 f0 = Path(os.path.basename(fov_files[0])).stem  # extract basename without file extension
     # to get corresponding file naming convention (minus up to 5 digits of FOV number)
