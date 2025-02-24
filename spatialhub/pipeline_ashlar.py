@@ -250,7 +250,7 @@ def ashlarConvertCoords(infile, outfile):
     '''
 
     t = T.setup(infile, outfile, PARAMS,
-                memory=4,
+                memory=8,
                 cpu=1)
     
     input_sample = os.path.basename(infile)[:-len("_ashlarStitch.sentinel")]
