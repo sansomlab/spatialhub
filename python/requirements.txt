@@ -15,8 +15,8 @@ sqlalchemy
 setuptools
 Cython
 pysam
-cgatcore
-cgatcore.iotools
+cgatcore  # skip - already installed via GitHub
+cgatcore.iotools  # skip - already installed via GitHub
 
 # spatial pipeline requirements
 tifffile
@@ -32,7 +32,6 @@ blessed
 ashlar
 torch
 'spatialdata[extra]'
-
 
 
 ### DRAFT requirements TBC ###
