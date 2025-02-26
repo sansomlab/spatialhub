@@ -34,6 +34,7 @@ ashlar:
     # (useful to open files in Cellpose GUI)
     # Use *numbers* for now (need to add functionality to parse Channel Dictionary)
     # Default PanCk, Membrane, DNA
+    save_three_color_img: False
     keep_channels: 0,2,4
 
     # < Add option to simplify the transcripts file or not >

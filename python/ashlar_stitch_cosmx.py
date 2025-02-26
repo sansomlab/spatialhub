@@ -27,6 +27,8 @@ parser.add_argument("--pxSize", default=0.120280945, type=str,
                     help="pixel to micrometer conversion factor")
 parser.add_argument("--tileOvlp", default=0.01, type=str,
                     help="overlap between adjacent FOV tiles")
+parser.add_argument("--saveLiteImg", default="False", type=str,
+                    help="whether to save 3-channel (lite) image")
 parser.add_argument("--keepChannels", default="0,2,4", type=str,
                     help="channels to keep in 3-channel saving mode")
 
@@ -36,11 +38,13 @@ args = parser.parse_args()
 px_size = float(args.pxSize)
 tile_ovlp = float(args.tileOvlp)
 
-x = args.keepChannels
-x = x.split(",")
-x = list(map(int, x))
-keepChannels = x
-print(keepChannels)
+saveLiteImg = eval(args.saveLiteImg)
+if saveLiteImg:
+    x = args.keepChannels
+    x = x.split(",")
+    x = list(map(int, x))
+    keepChannels = x
+    print("The following channels will be kept in 3-color saving mode:", keepChannels)
 
 
 ### SETUP ###
@@ -115,12 +119,13 @@ print()
 print("Wrote full .ome.tif")
 
 # Save stitched image with 3 shannels (for Cellpose GUI)
-mosaic_light = Mosaic(aligner, aligner.mosaic_shape, channels=keepChannels, verbose=True)
-outFile = os.path.join(outDir, sampleName + "_stitched_3-channel.ome.tiff")
-writer = PyramidWriter([mosaic_light], outFile, verbose=True)
-writer.run()
-print()
-print("Wrote 3-channel .ome.tif")
+if saveLiteImg:
+    mosaic_light = Mosaic(aligner, aligner.mosaic_shape, channels=keepChannels, verbose=True)
+    outFile = os.path.join(outDir, sampleName + "_stitched_3-channel.ome.tiff")
+    writer = PyramidWriter([mosaic_light], outFile, verbose=True)
+    writer.run()
+    print()
+    print("Wrote 3-channel .ome.tif")
 
 
 ### Create table of corrected positions and shifts for each FOV

@@ -226,6 +226,7 @@ def ashlarStitch(infile, outfile):
     input_sample = os.path.basename(infile)[:-len("_ashlarSetup.sentinel")]
     px_size = PARAMS["ashlar_pixel_size"]
     tile_ovlp = PARAMS["ashlar_tile_overlap"]
+    save_lite_img = PARAMS["ashlar_save_three_color_img"]
     keep_channels = PARAMS["ashlar_keep_channels"]
     
     statement = '''python %(spatialhub_code_dir)s/python/ashlar_stitch_cosmx.py 
@@ -233,6 +234,7 @@ def ashlarStitch(infile, outfile):
                    --fov2sample=%(sample_table)s
                    --pxSize=%(px_size)s
                    --tileOvlp=%(tile_ovlp)s
+                   --saveLiteImg=%(save_lite_img)s
                    --keepChannels=%(keep_channels)s
                    &> %(log_file)s
                 ''' % dict(PARAMS, **t.var, **locals())
