@@ -1,0 +1,60 @@
+#
+# Pipeline pipeline_qc.py configuration file
+# ==================================================
+#
+
+# General options
+# ---------------
+
+# Path to .h5ad or .rds file containing the counts matrix and associated metadata 
+matrix_file: /users/sansom/tme871/work/cosmx_mouse/spatialhub/anndata.dir/mouse_ibd_hh_atomx.h5ad 
+
+# Location of the samples.tsv table
+# (see documentation for deta
+sample_table: /users/sansom/tme871/work/cosmx_mouse/metadata/mouse_ibd_hh_spatialhub_samples.tsv 
+
+# Allocated memory (requirements depends on size of input matrix)
+mem: 8G
+
+
+# Probe panel specific options
+# ---------------
+
+# Patterns matching different sub-groups of cell probes
+probes:
+    background: Negative  # Default negative control probe name for CosMx
+    poscontrol: System    # Default positive control probe name for CosMx
+
+# Path to a .csv table describing custom probes, if applicable
+custom_panel: True
+custom_probes_table: /users/sansom/tme871/work/cosmx_mouse/metadata/1K_Oxford_Sansom_1-clean.csv
+
+
+# FOV-level QC
+# ---------------
+
+FOV:
+    runQC: True  # Whether to run FOV-level QC at all (can be turned off if no FOV data available)
+    average_nCount_cutoff: 50
+    SNR_cutoff: 3
+    
+bruker:
+    runQC: True  # Whether to run FOV QC tool from Bruker to detect instrument failures with CosMx
+    code: /gpfs3/well/sansom/users/tme871/devel/spatialhub/R/bruker_FOV_QC_utils.R
+    data: /gpfs3/well/sansom/users/tme871/devel/spatialhub/data/bruker_barcodes_panel.RDS
+
+
+# Filtering options
+# ---------------
+
+# Default parameters are recommendations for a CosMx slide (up-to-date as of February 2025)
+# These filtering options are not applied to the dataset by default,
+# they only serve to display post-QC metrics in reports and to define pass/fail cells in metadata
+# [NOTE: Filtering based on cell area outliers is left for segmentation QC]
+filtering:
+    cell_nCount_cutoff: 20
+    cell_nFeature_cutoff: 5
+    cell_percentNeg_cutoff: 5
+    cell_complexity_cutoff: 1
+    sample_min_cells_passQC: 2500
+    sample_min_percent_passQC: 50

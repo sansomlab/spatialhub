@@ -118,24 +118,15 @@ if len(sys.argv) > 1:
 
 #@active_if(runAshlar)
 def split_jobs():
-     
+
     if not os.path.exists("ashlar.dir"):
         os.mkdir("ashlar.dir")
     
     if not os.path.exists("ashlar.dir/logs"):
         os.mkdir("ashlar.dir/logs")
 
-
     for slide in S.slide_ids():
-        
-        #slide_path = os.path.join("ashlar.dir", slide + ".tsv")
-        
-        # Add if statement to not overwrite date stamp when .tsv file already exists
-        #if not os.path.isfile(slide_path):
-        #    S.write_tsv("slide_id", slide, slide_path)
-            
         sentinel_file = os.path.join("ashlar.dir/logs", slide + "_splitFlatFiles.sentinel")
-        
         yield([None, sentinel_file])
 
 
@@ -176,15 +167,8 @@ def sample_jobs():
     if not os.path.exists("ashlar.dir/logs"):
         os.mkdir("ashlar.dir/logs")
 
-    
     for sample in S.sample_ids():
-        
-        #sample_path = os.path.join("ashlar.dir", sample + ".tsv")
-        #if not os.path.isfile(sample_path):
-        #    S.write_tsv("sample_id", sample, sample_path)
-        
         sentinel_file = os.path.join("ashlar.dir/logs", sample + "_ashlarSetup.sentinel")
-
         yield([None, sentinel_file])
 
 
