@@ -622,6 +622,7 @@ keepVar <- sort(which(names(dfa) %in% c(sample_qc_vars,
                 )
 dfs <- dfa[, keepVar] |> dplyr::select(-fov)
 dfs <- dfs[!duplicated(dfs), ]
+dfs <- dfs[!is.na(dfs$sample_id), ]
 rownames(dfs) <- 1:nrow(dfs)
 
 print("Saving sample-level QC metrics:")

@@ -1,0 +1,590 @@
+---
+title: "CosMx FOV QC"
+author: Amélie Julé (Sansom Lab)
+date: "`r Sys.Date()`"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+---
+
+```{r setup, include = FALSE} 
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, error = TRUE,
+                      prompt = FALSE, cache = FALSE, tidy = FALSE)
+set.seed(123456789)
+```
+
+```{r libraries}
+library(data.table)
+library(ggplot2)
+library(ggpubr)
+library(gridExtra)
+library(matrixStats)
+library(patchwork)
+library(pheatmap)
+library(RColorBrewer)
+library(reshape2)
+library(SingleCellExperiment)
+library(tidyverse)
+```
+
+```{r graphical_params, child="_graphical_params.Rmd", eval=file.exists("_graphical_params.Rmd")}
+```
+
+```{r, echo=FALSE}
+# Adjust the following parameters depending on the number of slides to display in one plot
+plot_ncol_spatial <- 4
+plot_ncol <- 2
+font_size <- 10
+legend_size <- 3
+```
+
+```{r header, child="probeqc_header.Rmd", eval=file.exists("probeqc_header.Rmd")}
+```
+
+
+## Slide overview
+
+This dataset covers the following number of FOVs per slide:
+
+```{r}
+table(qc_fov$slide_id)
+```
+
+```{r, eval=FALSE, echo=FALSE}
+print("The following probe panel(s) are included in this experiment: ")
+table(rowData(sce)$group)
+```
+
+* * *
+
+**The following sample(s) are found on each slide:**
+
+```{r}
+# Generate list of spatial plots per slide
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = sample_name)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_manual(values = sample(gg_color_hue(length(unique(spx_meta$sample_name))))) +
+    guides(colour = guide_legend(override.aes = list(size = legend_size))) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed() + theme(legend.position = 'none')
+    #geom_hline(yintercept = unique(fov_df$y_global_px[fov_df$FOV %in% fovs]), col = "grey50") +
+    #geom_vline(xintercept = unique(fov_df$x_global_px[fov_df$FOV %in% fovs]), col = "grey50")
+  
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+
+Before QC, each sample totals the following number of cells:
+
+```{r}
+qc_sample |> dplyr::select(sample_index, nCell_sampleSum) |> dplyr::arrange(desc(nCell_sampleSum))
+```
+
+* * *
+* * *
+* * *
+
+
+# FOV QC
+
+<span style="color: red;">**WARNING**: Data capture with the CosMx technology can vary greatly from FOV to FOV!</span>
+
+
+## Visual assessment of variation in space {.tabset}
+
+### Total counts per cell
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(nCount_RNA) |> 
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = nCount_RNA)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_gradient(low = "grey75", high = "blue") +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed() + theme(legend.position = 'none')
+  
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+***
+
+### FOV average counts per cell
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(nCount_RNA_FOVavg) |> 
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = nCount_RNA_FOVavg)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_gradient(low = "grey75", high = "blue") +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed() + theme(legend.position = 'none')
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+***
+
+### Total counts per FOV
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(nCount_RNA_FOVsum) |> 
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = nCount_RNA_FOVsum)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_gradient(low = "grey75", high = "blue") +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed() + theme(legend.position = 'none')
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+***
+
+### Total cells per FOV
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(nCell_FOVsum) |> 
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = nCell_FOVsum)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_gradient(low = "grey75", high = "blue") +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed() + theme(legend.position = 'none')
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+***
+
+
+## Distribution of transcripts per cell within each FOV {.tabset}
+
+**Number of Pass/Fail per sample at user-defined threshold for mean `nCount_RNA` per cell:**
+
+```{r}
+FOV_nCount_low <- min(qc_fov$nCount_RNA_FOVavg[qc_fov$qcFlagFOV_nCount == "Pass"])
+print(paste0("Lowest mean `nCount_RNA` per cell in FOVs that passed QC: ", 
+             round(FOV_nCount_low, 3)))
+
+# Reminder: by default, the cutoff is set to 50 (unless otherwise specified in the YAML file)
+f0 <- table(qc_fov$sample_index)
+f50 <- table(qc_fov$sample_index, qc_fov$qcFlagFOV_nCount)
+f50percent <- round(f50 / rep(f0, 2) * 100, 1)
+
+c0 <- table(spx_meta$sample_index)
+c50 <- table(spx_meta$sample_index, spx_meta$qcFlagFOV_nCount)
+c50percent <- round(c50 / rep(c0, 2) * 100, 1)
+
+df <- cbind(f50, f50percent, c50, c50percent)
+colnames(df) <- c("Total failed FOVs", "Total passed FOVs",
+                  "Percent failed FOVs", "Percent passed FOVs",
+                  "Total cells in failed FOVs", "Total cells in passed FOVs",
+                  "Percent cells in failed FOVs", "Percent cells in passed FOVs"
+                  )
+df |> as.data.frame()
+```
+
+* * *
+
+In summary, per condition of interest:
+
+```{r}
+all_groups <- round(table(spx_meta$qcFlagFOV_nCount) / nrow(spx_meta) * 100, 1)
+t <- table(spx_meta$group, spx_meta$qcFlagFOV_nCount)
+t <- round(t / rep(table(spx_meta$group), 2) * 100, 1)
+
+df <- rbind(all_groups, t)
+df
+```
+
+
+### Per sample
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(qc_fov$slide_id))) {
+
+  g <- qc_fov |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(nCount_RNA_FOVavg) |>
+    ggplot(aes(x = nCount_RNA_FOVavg, y = sample_name, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + geom_jitter(width = 0, height = 0.1, size = 0.8) +
+    xlab("Average nCount_RNA per cell per FOV") + 
+    geom_vline(xintercept = floor(FOV_nCount_low), lty = 2) +
+    theme_classic(base_size = font_size) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+
+### Per group
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(qc_fov$slide_id))) {
+
+  g <- qc_fov |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(nCount_RNA_FOVavg) |>
+    ggplot(aes(x = nCount_RNA_FOVavg, y = group, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + geom_jitter(width = 0, height = 0.1, size = 0.8) +
+    xlab("Average nCount_RNA per cell per FOV") + 
+    geom_vline(xintercept = floor(FOV_nCount_low), lty = 2) +
+    theme_classic(base_size = font_size) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, nrow = plot_ncol))
+```
+
+***
+
+### Spatial plot
+
+This spatial plot flags cells with low average `nCount_RNA` per cell.
+
+```{r}
+spx_meta$qcFlagFOV_nCount <- factor(as.character(spx_meta$qcFlagFOV_nCount), levels = c("Pass", "Fail"))
+
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = qcFlagFOV_nCount)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_manual(values = c("grey70", "red2")) +
+    theme(legend.position = "none") +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed()
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+***
+
+
+## Signal to noise ratio within each FOV {.tabset}
+
+The signal to noise ratio is defined as the FOV total number of detected probes normalized to the number of distinct probes in the panel, divided by the FOV total number negative probes normalized to the number of distinc negative probes. **Ideally, this signal to noise ratio should be <5** (per CosMx support team recommendations)
+
+* * *
+
+**Number of Pass/Fail per sample at user-defined threshold for signal to noise ratio (SNR):**
+
+```{r}
+FOV_SNR_low <- min(qc_fov$FOV_SNR[qc_fov$qcFlagFOV_SNR == "Pass"])
+print(paste0("Lowest SNR in FOVs that passed QC: ", round(FOV_SNR_low, 3)))
+
+# Reminder: by default, the cutoff is set to 3 (unless otherwise specified in the YAML file)
+f0 <- table(qc_fov$sample_index)
+f50 <- table(qc_fov$sample_index, qc_fov$qcFlagFOV_SNR)
+f50percent <- round(f50 / rep(f0, 2) * 100, 1)
+
+c0 <- table(spx_meta$sample_index)
+c50 <- table(spx_meta$sample_index, spx_meta$qcFlagFOV_SNR)
+c50percent <- round(c50 / rep(c0, 2) * 100, 1)
+
+df <- cbind(f50, f50percent, c50, c50percent)
+colnames(df) <- c("Total failed FOVs", "Total passed FOVs",
+                  "Percent failed FOVs", "Percent passed FOVs",
+                  "Total cells in failed FOVs", "Total cells in passed FOVs",
+                  "Percent cells in failed FOVs", "Percent cells in passed FOVs"
+                  )
+df |> as.data.frame()
+```
+
+* * *
+
+In summary, per condition of interest:
+
+```{r}
+all_groups <- round(table(spx_meta$qcFlagFOV_SNR) / nrow(spx_meta) * 100, 1)
+t <- table(spx_meta$group, spx_meta$qcFlagFOV_SNR)
+t <- round(t / rep(table(spx_meta$group), 2) * 100, 1)
+
+df <- rbind(all_groups, t)
+df
+```
+
+
+### Per sample
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(qc_fov$slide_id))) {
+
+  g <- qc_fov |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(FOV_SNR) |>
+    ggplot(aes(x = FOV_SNR, y = sample_name, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + geom_jitter(width = 0, height = 0.1, size = 0.8) +
+    xlab("Signal to noise ratio per FOV") + geom_vline(xintercept = floor(FOV_SNR_low), lty = 2) +
+    theme_classic(base_size = font_size) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+
+### Per group
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(qc_fov$slide_id))) {
+
+  g <- qc_fov |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(FOV_SNR) |>
+    ggplot(aes(x = FOV_SNR, y = group, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + geom_jitter(width = 0, height = 0.1, size = 0.8) +
+    xlab("Signal to noise ratio per FOV") + geom_vline(xintercept = floor(FOV_SNR_low), lty = 2) +
+    theme_classic(base_size = font_size) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+
+### Spatial plot
+
+This spatial plot flags cells with low signal to noise ratio (SNR).
+
+```{r}
+spx_meta$qcFlagFOV_SNR <- factor(as.character(spx_meta$qcFlagFOV_SNR), levels = c("Pass", "Fail"))
+
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = qcFlagFOV_SNR)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_manual(values = c("grey70", "red2")) +
+    theme(legend.position = "none") +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed()
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+***
+
+
+## Per-sample instrument failures {.tabset}
+
+`spatialhub` enables to run a FOV QC tool from Bruker Spatial Biology, Inc. to check for instrument failures. **For additional FOV-level QC options from the company, see also [NanoString blog](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/)**
+
+
+### Any instrument failure
+
+This may notably include low average `nCount_RNA` per cell, and is thus redundant with the above.
+
+```{r}
+spx_meta$qcFlagInstr <- factor(as.character(spx_meta$qcFlagInstr), levels = c("Pass", "Fail"))
+
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = qcFlagInstr)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_manual(values = c("grey70", "red2")) +
+    theme(legend.position = "none") +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed() + ggtitle("Instrument failures")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+* * *
+* * *
+* * *
+
+### Failure introducing gene bias
+
+The flagged FOVs were affected by instrument failures that did not affect all genes equally, which may lead to biases in downstream analyses.
+
+```{r}
+spx_meta$qcFlagGeneBias <- factor(as.character(spx_meta$qcFlagGeneBias), levels = c("Pass", "Fail"))
+
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = qcFlagGeneBias)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_manual(values = c("grey70", "red2")) +
+    theme(legend.position = "none") +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed() + ggtitle("Failure with gene bias")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+* * *
+* * *
+* * *
+
+
+# Conclusion on FOV QC
+
+
+## Spatial plot flagging Pass/Fail FOVs
+
+The following plot flags FOVs that failed on any of the following FOV QC metrics:
+
+- Average `nCount_RNA` per cell below user-specified threshold
+- Signal to noise ratio (SNR) below user-specified threshold
+- Instrument failure introducing gene bias (if Bruker FOV QC tool was run)
+
+```{r}
+spx_meta$qcFlagFOV_summary <- factor(as.character(spx_meta$qcFlagFOV_summary), levels = c("Pass", "Fail"))
+
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = qcFlagFOV_summary)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_manual(values = c("grey70", "red2")) +
+    theme(legend.position = "none") +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed()
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+***
+
+## Spatial plot flagging Pass/Fail samples
+
+It can be helpful to review FOV QC alongside sample quality. As a reminder, **`spatialhub` flags a sample as low-quality whenever either of the following condition applies**:
+
+- Fewer than the user-specified minimum number of cells per sample are left after excluding low-quality cells;
+- Fewer than the user-specified percentage of cells are left for that sample after excluding low-quality cells.
+
+Low-quality cells are those that failed on any of the cell-level QC metrics (see companion report for details), or those that fall within a low-quality FOV (as defined in the plot above).
+
+```{r}
+spx_meta$qcFlagSample_summary <- factor(as.character(spx_meta$qcFlagSample_summary), levels = c("Pass", "Fail"))
+
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = qcFlagSample_summary)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_manual(values = c("grey70", "red2")) +
+    theme(legend.position = "none") +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed()
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+Samples flagged as low-quality are listed below, alongside their summary QC metrics:
+
+```{r}
+qc_sample[qc_sample$qcFlagSample_summary == "Fail", ] |>
+  dplyr::select(sample_index, group, samplePercentCellsInFailedFOV, 
+                nCell_sampleSum_passQC, samplePercentCellsPassQC)
+```
+
+* * *
+* * *
+* * *
+
+
+# R session
+
+```{r}
+sessionInfo()
+```
+

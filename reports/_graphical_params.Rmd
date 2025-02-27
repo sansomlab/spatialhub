@@ -1,0 +1,85 @@
+
+
+```{css zoom-lib-src, echo = FALSE}
+script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"
+```
+
+```{js zoom-jquery, echo = FALSE}
+ $(document).ready(function() {
+    $('body').prepend('<div class=\"zoomDiv\"><img src=\"\" class=\"zoomImg\"></div>');
+    // onClick function for all plots (img's)
+    $('img:not(.zoomImg)').click(function() {
+      $('.zoomImg').attr('src', $(this).attr('src')).css({width: '100%'});
+      $('.zoomDiv').css({opacity: '1', width: 'auto', border: '1px solid white', borderRadius: '5px', position: 'fixed', top: '50%', left: '50%', marginRight: '-50%', transform: 'translate(-50%, -50%)', boxShadow: '0px 0px 50px #888888', zIndex: '50', overflow: 'auto', maxHeight: '100%'});
+    });
+    // onClick function for zoomImg
+    $('img.zoomImg').click(function() {
+      $('.zoomDiv').css({opacity: '0', width: '0%'}); 
+    });
+  });
+```
+
+
+```{r default_size, echo=FALSE}
+ggplot2::theme_set(theme_light(base_size = 11))
+
+knitr::opts_chunk[["set"]](
+    dev = c("png", "pdf"),
+    highlight = TRUE,
+    fig.height = 9L,
+    fig.retina = 2L,
+    fig.width = 12L)
+
+theme_black <- theme(
+    # get rid of panel grids
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    # set axes to white
+    axis.line = element_line(color = "white"),
+    axis.ticks = element_line(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    # set plot and panel background
+    plot.background=element_rect(fill = "black"),
+    panel.background = element_rect(fill = 'black'),
+    # adjust legend 
+    legend.background = element_rect(fill = "black", color = NA),
+    legend.key = element_rect(color = NA, fill = "black"),
+    legend.title = element_text(color = "white"),
+    legend.text = element_text(color = "white")
+  )
+```
+
+
+```{r color_palettes, echo=FALSE}
+# Define color scales for up to 24 clusters/samples
+colsD <- RColorBrewer::brewer.pal(8, "Dark2")
+colsM <- RColorBrewer::brewer.pal(8, "Set2")
+colsL <- RColorBrewer::brewer.pal(8, "Pastel2")
+
+# Stack same colors from dark to pastel
+cols3 <- unlist(strsplit(paste(colsD, colsM, colsL, sep = "_"), "_"))
+cols2 <- c(unlist(strsplit(paste(colsD, colsM, sep = "_"), "_")), "deepskyblue2")
+
+# Study-specific color-scale
+cols_tx <- c("royalblue3", cols2[c(11:12, 1:10)])
+cols_tx2 <- c("deepskyblue2", cols2)
+
+# Function emulating ggplot2 color palette
+gg_color_hue <- function(n) {
+  hues = seq(15, 375, length = n + 1)
+  hcl(h = hues, l = 65, c = 100)[1:n]
+}
+```
+
+```{r default_hm_cols}
+# Heatmap color-scale
+scaleBreaks <- seq(-2, 2, by = 0.01)
+hm_cols <- colorRampPalette(
+           c(#"darkblue", 
+             "blue2",
+             "whitesmoke",
+             "red3"#, "darkred"
+           )
+         )(length(scaleBreaks))
+```

@@ -1,0 +1,88 @@
+
+```{r define_params}
+#fov2sample_file <- ""  # spatialhub's samples.tsv table
+#matrix_file <- ""  # input to pipeline probeqc
+#custom_probes_file <- "../metadata/1K_Oxford_Sansom_1-clean.csv"  # leave empty if universal panel only
+
+qcmetrics_file <- "../probeqc.dir/mouse_ibd_hh_atomx_metadata_QC.csv"  # "*_metadata_QC.csv" output from pipeline probeqc
+sample_qc_file <- "../probeqc.dir/mouse_ibd_hh_atomx_sampleQCmetrics.csv"  # "*_sampleQCmetrics" output from pipeline probeqc
+fov_qc_file <- "../probeqc.dir/mouse_ibd_hh_atomx_fovQCmetrics.csv"  # "*_fovQCmetrics.csv" output from pipeline probeqc
+
+# Define list of interest genes for the study
+#geneSig_probes <- c("Elane", "Mpo", "Ly6G", "Cd177", "Ltf", "Pglyrp1", "Stfa2l1", "Mrgpra2a", "Mrgpra2b")
+
+# Define study-specifc contrast variable (notably, to split plots)
+x <- "condition"
+```
+
+
+# Overview
+
+- Experiment: Spatial transcriptomics study of _H. hepaticus_ mouse model of IBD
+- Sections were obtained from the distal and proximal colon at 3 different time points post-infection, as well as at steady state.
+
+
+## Data import
+
+[Importing sample, FOV and cell-level **metadata** from spatialhub probeqc pipeline]
+
+```{r}
+# Import metadata at different levels and set condition of interest
+qc_sample <- read.csv(sample_qc_file)
+qc_sample$group <- factor(as.character(qc_sample[, x]))
+
+qc_fov  <- read.csv(fov_qc_file)
+qc_fov$sample_index <- paste0(qc_fov$slide_id, "_", qc_fov$sample_name)
+qc_fov$group <- factor(as.character(qc_fov[, x]))
+
+spx_meta <- read.csv(qcmetrics_file)
+spx_meta$group <- factor(as.character(spx_meta[, x]))
+```
+
+* * *
+
+[Reading original counts matrix as single-cell experiment object]
+
+```{r, eval=FALSE, echo=FALSE}
+# Create single-cell experiment object matching counts and metadata
+sce  # read sce file here
+
+if (nchar(custom_probes_file) > 0) {
+  
+  custom_probes <- read.csv(custom_probes_file)
+  custom_probes <- custom_probes |> dplyr::select(-gene_symbol)
+  custom_probes <- custom_probes[!duplicated(custom_probes), ]
+  
+  df <- data.frame("probe_name" = rownames(sce))
+  df <- plyr::join(df, custom_probes, by = "probe_name")
+  
+  df$group[is.na(df$group)] <- "Mm_UCC"; df$species[is.na(df$species)] <- "mouse"
+  df$group[df$group == "mouse"] <- "Mm_add"
+  df$group[df$group == "bac"] <- "Bac_add"
+  
+} else { 
+  df <- data.frame("probe_name" = rownames(sce), "group" = params$cosmxPanel)
+}
+
+rownames(df) <- df$probe_name
+rowData(sce) <- df
+
+# < update metadata to postQC data (?) >
+```
+
+* * *
+
+[Defining study-specific gene signature, if applicable]
+
+```{r, eval=FALSE, echo=FALSE}
+# Add study-specific gene signature for a quick peak at a cell type of interest
+print("Gene signature here defined as: ")
+geneSig_probes <- geneSig_probes[geneSig_probes %in% rownames(sce)]; geneSig_probes
+
+colData(sce)$nCount_geneSig <- colSums(assay(sce)[rownames(assay(sce)) %in% geneSig_probes, ])
+colData(sce)$geneSig_any <- colSums(assay(sce[geneSig_probes, ]) > 0) > 0
+colData(sce)$geneSig_multi <- colSums(assay(sce[geneSig_probes, ]) > 0) >= round(length(geneSig_probes)/3)
+```
+
+* * *
+
