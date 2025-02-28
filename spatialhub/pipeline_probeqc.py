@@ -162,9 +162,85 @@ def calculateQCmetrics(infile, outfile):
     IOTools.touch_file(outfile)
 
 
+
+
+@active_if(PARAMS["compile_reports"] and PARAMS["runFOVqc"])
+@transform(calculateQCmetrics,
+           regex(r"(.*)/(.*).sentinel"),
+           r"\1/\2_reports.sentinel")
+def compileFOVreport(infile, outfile):
+    '''
+    Compile R markdown report for easy lookup of FOV-level QC metrics
+    '''
+
+    t = T.setup(infile, outfile, PARAMS,
+                memory=8,
+                cpu=1)
+
+    if not os.path.exists("probeqc.dir/probeqc_header.Rmd"):
+        shutil.copy(os.path.join(PARAMS["spatialhub_code_dir"], "reports",
+                                 "probeqc_header.Rmd"),
+                    "probeqc.dir/probeqc_header.Rmd")
+
+    if not os.path.exists("probeqc.dir/_graphical_params.Rmd"):
+        shutil.copy(os.path.join(PARAMS["spatialhub_code_dir"], "reports",
+                                 "_graphical_params.Rmd"),
+                    "probeqc.dir/_graphical_params.Rmd")
+    
+    if not os.path.exists("probeqc.dir/probeqc_FOV_report.Rmd"):
+        shutil.copy(os.path.join(PARAMS["spatialhub_code_dir"], "reports",
+                                 "probeqc_FOV_report.Rmd"),
+                    "probeqc.dir/probeqc_FOV_report.Rmd")
+    
+    statement = ''' Rscript -e 'rmarkdown::render("probeqc.dir/probeqc_FOV_report.Rmd", "html_document")'
+                   &> %(log_file)s
+                ''' % dict(PARAMS, **t.var, **locals())
+    
+    P.run(statement, **t.resources)
+    IOTools.touch_file(outfile) 
+
+
+
+
+@active_if(PARAMS["compile_reports"] and PARAMS["runFOVqc"])
+@transform(calculateQCmetrics,
+           regex(r"(.*)/(.*).sentinel"),
+           r"\1/\2_reports.sentinel")
+def compileCellReport(infile, outfile):
+    '''
+    Compile R markdown report for easy lookup of cell-level QC metrics
+    '''
+
+    t = T.setup(infile, outfile, PARAMS,
+                memory=8,
+                cpu=1)
+
+    if not os.path.exists("probeqc.dir/probeqc_header.Rmd"):
+        shutil.copy(os.path.join(PARAMS["spatialhub_code_dir"], "reports",
+                                 "probeqc_header.Rmd"),
+                    "probeqc.dir/probeqc_header.Rmd")
+
+    if not os.path.exists("probeqc.dir/_graphical_params.Rmd"):
+        shutil.copy(os.path.join(PARAMS["spatialhub_code_dir"], "reports",
+                                 "_graphical_params.Rmd"),
+                    "probeqc.dir/_graphical_params.Rmd")
+    
+    if not os.path.exists("probeqc.dir/probeqc_cell_report.Rmd"):
+        shutil.copy(os.path.join(PARAMS["spatialhub_code_dir"], "reports",
+                                 "probeqc_cell_report.Rmd"),
+                    "probeqc.dir/probeqc_cell_report.Rmd")
+    
+    statement = ''' Rscript -e 'rmarkdown::render("probeqc.dir/probeqc_cell_report.Rmd", "html_document")'
+                   &> %(log_file)s
+                ''' % dict(PARAMS, **t.var, **locals())
+    
+    P.run(statement, **t.resources)
+    IOTools.touch_file(outfile) 
+
+
 # --------------------- < generic pipeline tasks > -------------------------- #
 
-@follows(calculateQCmetrics)
+@follows(calculateQCmetrics, compileFOVreport, compileCellReport)
 def full():
     pass
 

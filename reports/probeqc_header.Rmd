@@ -1,9 +1,11 @@
 
 ```{r define_params}
 # Define path to necessary data files
-qcmetrics_file <- "../probeqc.dir/mouse_ibd_hh_atomx_metadata_QC.csv"  # "*_metadata_QC.csv" output from pipeline probeqc
-sample_qc_file <- "../probeqc.dir/mouse_ibd_hh_atomx_sampleQCmetrics.csv"  # "*_sampleQCmetrics" output from pipeline probeqc
-fov_qc_file <- "../probeqc.dir/mouse_ibd_hh_atomx_fovQCmetrics.csv"  # "*_fovQCmetrics.csv" output from pipeline probeqc
+probeqc_files <- list.files("probeqc.dir/", full.names = TRUE)
+
+qcmetrics_file <- grep("_metadata_QC.csv", probeqc_files)  # "*_metadata_QC.csv" output from pipeline probeqc
+sample_qc_file <- grep("_sampleQCmetrics.csv", probeqc_files)  # "*_sampleQCmetrics" output from pipeline probeqc
+fov_qc_file <- grep("_fovQCmetrics.csv", probeqc_files)  # "*_fovQCmetrics.csv" output from pipeline probeqc
 
 # Define study-specific contrast variable (notably, to split plots)
 x <- "condition"
@@ -12,9 +14,7 @@ x <- "condition"
 
 # Overview
 
-- Experiment: Spatial transcriptomics study of _H. hepaticus_ mouse model of IBD
-- Sections were obtained from the distal and proximal colon at 3 different time points post-infection, as well as at steady state.
-
+[Insert your study description here]
 
 ## Data import
 
@@ -25,9 +25,11 @@ x <- "condition"
 qc_sample <- read.csv(sample_qc_file)
 qc_sample$group <- factor(as.character(qc_sample[, x]))
 
-qc_fov  <- read.csv(fov_qc_file)
-qc_fov$sample_index <- paste0(qc_fov$slide_id, "_", qc_fov$sample_name)
-qc_fov$group <- factor(as.character(qc_fov[, x]))
+if (report == "fovQC") {
+    qc_fov  <- read.csv(fov_qc_file)
+    qc_fov$sample_index <- paste0(qc_fov$slide_id, "_", qc_fov$sample_name)
+    qc_fov$group <- factor(as.character(qc_fov[, x]))
+}
 
 spx_meta <- read.csv(qcmetrics_file)
 spx_meta$group <- factor(as.character(spx_meta[, x]))

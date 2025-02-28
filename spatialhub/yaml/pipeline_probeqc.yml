@@ -39,7 +39,7 @@ FOV:
     SNR_cutoff: 3
     
 bruker:
-    runQC: True  # Whether to run FOV QC tool from Bruker to detect instrument failures with CosMx
+    runQC: True  # Whether to run FOV QC tool from Bruker to detect instrument failures with CosMx (requires FOV_runQC to be True)
     code: /gpfs3/well/sansom/users/tme871/devel/spatialhub/R/bruker_FOV_QC_utils.R
     data: /gpfs3/well/sansom/users/tme871/devel/spatialhub/data/bruker_barcodes_panel.RDS
 
@@ -49,7 +49,7 @@ bruker:
 
 # Default parameters are recommendations for a CosMx slide (up-to-date as of February 2025)
 # These filtering options are not applied to the dataset by default,
-# they only serve to display post-QC metrics in reports and to define pass/fail cells in metadata
+# they only serve to display post-QC metrics in reports and to flag pass/fail cells in metadata
 # [NOTE: Filtering based on cell area outliers is left for segmentation QC]
 filtering:
     cell_nCount_cutoff: 20
@@ -58,3 +58,11 @@ filtering:
     cell_complexity_cutoff: 1
     sample_min_cells_passQC: 2500
     sample_min_percent_passQC: 50
+
+
+# R Markdown reports
+# ---------------
+
+# A template QC report is provided to facilitate exploration of the metrics calculated above
+# However, it is recommended to further review QC metrics and adjust sample/FOV exclusion criteria accordingly.
+compile_reports: True
