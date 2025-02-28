@@ -649,3 +649,7 @@ u <- rowSums(counts_mat) |> sort(decreasing = FALSE)
 u10 <- u[-grep(opt$poscontrol, names(u))] |> head(n = 10)
 print("Least detected probes in this study (excluding positive controls): ")
 u10
+
+
+print("Done calculating QC metrics within the following R environment:")
+sessionInfo()

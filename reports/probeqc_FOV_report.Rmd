@@ -59,11 +59,6 @@ This dataset covers the following number of FOVs per slide:
 table(qc_fov$slide_id)
 ```
 
-```{r, eval=FALSE, echo=FALSE}
-print("The following probe panel(s) are included in this experiment: ")
-table(rowData(sce)$group)
-```
-
 * * *
 
 **The following sample(s) are found on each slide:**

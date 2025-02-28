@@ -1,0 +1,975 @@
+---
+title: "CosMx Cell QC"
+author: Amélie Julé (Sansom Lab)
+date: "`r Sys.Date()`"
+params:
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+---
+
+```{r setup, include = FALSE} 
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, error = TRUE,
+                      prompt = FALSE, cache = FALSE, tidy = FALSE)
+set.seed(123456789)
+```
+
+```{r libraries}
+library(data.table)
+library(ggplot2)
+library(ggpubr)
+library(gridExtra)
+library(matrixStats)
+library(patchwork)
+library(pheatmap)
+library(RColorBrewer)
+library(reshape2)
+library(SingleCellExperiment)
+library(tidyverse)
+```
+
+```{r graphical_params, child="_graphical_params.Rmd", eval=file.exists("_graphical_params.Rmd")}
+```
+
+```{r, echo=FALSE}
+# Adjust the following parameters depending on the number of slides to display in one plot
+plot_ncol_spatial <- 4
+plot_ncol <- 2
+font_size <- 10
+legend_size <- 3
+```
+
+```{r header, child="probeqc_header.Rmd", eval=file.exists("probeqc_header.Rmd")}
+```
+
+
+## Slide overview
+
+This dataset covers the following number of FOVs per slide:
+
+```{r}
+table(qc_fov$slide_id)
+```
+
+* * *
+
+**The following sample(s) are found on each slide:**
+
+```{r}
+# Generate list of spatial plots per slide
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = sample_name)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_manual(values = sample(gg_color_hue(length(unique(spx_meta$sample_name))))) +
+    guides(colour = guide_legend(override.aes = list(size = legend_size))) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed() + theme(legend.position = 'none')
+    #geom_hline(yintercept = unique(fov_df$y_global_px[fov_df$FOV %in% fovs]), col = "grey50") +
+    #geom_vline(xintercept = unique(fov_df$x_global_px[fov_df$FOV %in% fovs]), col = "grey50")
+  
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+
+Before QC, each sample totals the following number of cells:
+
+```{r}
+qc_sample |> dplyr::select(sample_index, nCell_sampleSum) |> dplyr::arrange(desc(nCell_sampleSum))
+```
+
+* * *
+* * *
+* * *
+
+
+# Cell QC
+
+"*Cell QC flags cells with low or spurious signal based on the number of targets detected (more is better), fraction of probes which are negative controls (fewer is better), uniformity of count distribution (higher complexity is preferred), and cell size (the top percentile may need to be removed as a QC of segmentation).*" (from AtoMx user manual) 
+
+**By default, `spatialhub` leaves the cell size QC parameter aside -- considered as a segmentation QC.**
+
+
+## Visual assessment of variation in space {.tabset}
+
+The following plots highlights the areas with higher `nCount_RNA` per cell, which tends to be sample/morphology specific. **Color scales are capped for contrast, readability and comparability across slides (where applicable).**
+
+
+### Total counts per cell (all probes)
+
+```{r}
+col_max <- signif(max(spx_meta$nCount_RNA) * 2/3, 2)
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(nCount_RNA) |> 
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = nCount_RNA)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_gradient(low = "grey75", high = "blue",
+                         limits = c(0, col_max), oob = scales::squish) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed() + theme(legend.position = 'none')
+  
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+
+### Total counts and distinct probes per cell: per-sample Zoom {.tabset}
+
+```{r}
+gg_ls <- list() 
+
+for (sample in unique(spx_meta$sample_index)) {
+  
+  spx_sample <- spx_meta |>
+    dplyr::filter(sample_index == sample)
+  nCells_sample <- unique(spx_sample$nCell_sampleSum)
+  
+  col_max <- signif(max(spx_sample$nCount_RNA) * 2/3, 2)
+  g1 <- spx_sample |>  
+    dplyr::arrange(nCount_RNA) |> 
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = nCount_RNA)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_gradient(low = "grey75", high = "blue",
+                         limits = c(0, col_max), oob = scales::squish) +
+    ggtitle(paste0("Cell count (pre-QC): ", nCells_sample)) + 
+    theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed()
+  
+  col_max <- signif(max(spx_sample$nFeature_RNA) * 2/3, 2)
+  g2 <- spx_sample |>  
+    dplyr::arrange(nFeature_RNA) |> 
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = nFeature_RNA)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_gradient(low = "grey75", high = "blue",
+                         limits = c(0, col_max), oob = scales::squish) +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed()
+  
+  gg_ls[[sample]] <- (g1 | g2)
+  
+}
+```
+
+```{r, results = 'asis'}
+for(i in 1:length(gg_ls)) {
+  
+  cat("#### ", names(gg_ls)[i], "\n")
+
+  cat("\n")
+  print(gg_ls[[i]])
+  cat("\n")
+  cat("\n")
+  
+} 
+```
+
+
+
+
+## Distribution of total transcripts per cell {.tabset}
+
+Centrality metrics for `nCount_RNA` (before QC) across different groups:
+
+```{r}
+spx_meta |>
+  group_by(group) |>
+  summarise(mean_nCount_RNA = round(mean(nCount_RNA), 1),
+            median_nCount_RNA = round(median(nCount_RNA), 1),
+            q05_nCount_RNA = round(quantile(nCount_RNA, 0.05), 1),
+            q95_nCount_RNA = round(quantile(nCount_RNA, 0.95), 1))
+```
+
+***
+
+**Number of Pass/Fail per sample at user-defined threshold for `nCount_RNA` per cell:**
+
+```{r}
+nCount_RNA_min <- min(spx_meta$nCount_RNA[spx_meta$qcFlagCell_summary == "Pass"])
+print(paste0("Lowest `nCount_RNA` per cell in cells that passed QC: ", 
+             round(nCount_RNA_min, 3)))
+
+# Reminder: by default, the cutoff is set to 20 (unless otherwise specified in the YAML file), as recommended by Bruker for the 1000-plex panel
+c0 <- table(spx_meta$sample_index)
+c20 <- table(spx_meta$sample_index, spx_meta$qcFlagCell_nCount)
+c20percent <- round(c20 / rep(c0, 2) * 100, 1)
+
+df <- cbind(c20, c20percent)
+colnames(df) <- c("Total failed cells", "Total passed cells",
+                  "Percent failed cells", "Percent passed cells")
+df |> as.data.frame()
+```
+
+***
+
+In summary, per condition of interest:
+
+```{r}
+all_groups <- round(table(spx_meta$qcFlagCell_nCount) / nrow(spx_meta) * 100, 1)
+t <- table(spx_meta$group, spx_meta$qcFlagCell_nCount)
+t <- round(t / rep(table(spx_meta$group), 2) * 100, 1)
+
+df <- rbind(all_groups, t)
+df
+```
+
+
+### Per sample
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(nCount_RNA) |>
+    ggplot(aes(x = nCount_RNA, y = sample_name, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
+    #geom_jitter(width = 0, height = 0.1, size = 0.2) +
+    xlab("Average nCount_RNA per cell per FOV") + 
+    geom_vline(xintercept = floor(nCount_RNA_min), lty = 2) +
+    theme_classic(base_size = font_size) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+
+### Per group
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(nCount_RNA) |>
+    ggplot(aes(x = nCount_RNA, y = group, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
+    #geom_jitter(width = 0, height = 0.1, size = 0.2) +
+    xlab("Average nCount_RNA per cell per FOV") + 
+    geom_vline(xintercept = floor(nCount_RNA_min), lty = 2) +
+    theme_classic(base_size = font_size) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+
+### Per group (log-scale)
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(nCount_RNA) |>
+    ggplot(aes(x = nCount_RNA, y = group, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
+    #geom_jitter(width = 0, height = 0.1, size = 0.2) +
+    xlab("Average nCount_RNA per cell per FOV") + 
+    geom_vline(xintercept = floor(nCount_RNA_min), lty = 2) +
+    theme_classic(base_size = font_size) +
+    scale_x_log10() +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+
+### `cell_key` rank
+
+```{r, out.width="80%"}
+spx_meta_ls <- split(spx_meta, f = spx_meta$slide_id)
+for (slide in names(spx_meta_ls)) {
+  spx_slide <- spx_meta_ls[[slide]]
+  spx_slide <- spx_slide |>
+    dplyr::arrange(desc(nCount_RNA)) |> 
+    dplyr::mutate(barcode_rank = seq(1:nrow(spx_slide)) / nrow(spx_slide))
+  spx_meta_ls[[slide]] <- spx_slide
+}
+spx_meta <- do.call(rbind.data.frame, spx_meta_ls)
+
+spx_meta |>
+  dplyr::arrange(desc(nCount_RNA)) |>
+  ggplot(aes(color = slide_id, y = nCount_RNA, x = barcode_rank)) + 
+  geom_point() +
+  geom_hline(yintercept = floor(nCount_RNA_min), lty = 2, col = "black") +
+  scale_y_log10() + 
+  theme_minimal() +
+  scale_color_manual(values = colsD) +
+  ggtitle("Cells ranked by total transcripts (nCount_RNA)")
+```
+
+***
+
+
+## Distribution of total distinct probes per cell {.tabset}
+
+Centrality metrics for `nFeature_RNA` (before QC) across different groups:
+
+```{r}
+spx_meta |>
+  group_by(group) |>
+  summarise(mean_nFeature_RNA = round(mean(nFeature_RNA), 1),
+            median_nFeature_RNA = round(median(nFeature_RNA), 1),
+            q05_nFeature_RNA = round(quantile(nFeature_RNA, 0.05), 1),
+            q95_nFeature_RNA = round(quantile(nFeature_RNA, 0.95), 1))
+```
+
+***
+
+**Number of Pass/Fail per sample at user-defined threshold for `nFeature_RNA` per cell:**
+
+```{r}
+nFeature_RNA_min <- min(spx_meta$nFeature_RNA[spx_meta$qcFlagCell_summary == "Pass"])
+print(paste0("Lowest `nFeature_RNA` per cell in cells that passed QC: ", 
+             round(nFeature_RNA_min, 3)))
+
+# Reminder: by default, the cutoff is set to 5 (unless otherwise specified in the YAML file), as recommended by Bruker for the 1000-plex panel
+c0 <- table(spx_meta$sample_index)
+c20 <- table(spx_meta$sample_index, spx_meta$qcFlagCell_nFeature)
+c20percent <- round(c20 / rep(c0, 2) * 100, 1)
+
+df <- cbind(c20, c20percent)
+colnames(df) <- c("Total failed cells", "Total passed cells",
+                  "Percent failed cells", "Percent passed cells")
+df |> as.data.frame()
+```
+
+***
+
+In summary, per condition of interest:
+
+```{r}
+all_groups <- round(table(spx_meta$qcFlagCell_nFeature) / nrow(spx_meta) * 100, 1)
+t <- table(spx_meta$group, spx_meta$qcFlagCell_nFeature)
+t <- round(t / rep(table(spx_meta$group), 2) * 100, 1)
+
+df <- rbind(all_groups, t)
+df
+```
+
+
+### Per sample
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(nFeature_RNA) |>
+    ggplot(aes(x = nFeature_RNA, y = sample_name, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
+    #geom_jitter(width = 0, height = 0.1, size = 0.2) +
+    xlab("Average nFeature_RNA per cell per FOV") + 
+    geom_vline(xintercept = floor(nFeature_RNA_min), lty = 2) +
+    theme_classic(base_size = font_size) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+
+### Per group
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(nFeature_RNA) |>
+    ggplot(aes(x = nFeature_RNA, y = group, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
+    #geom_jitter(width = 0, height = 0.1, size = 0.2) +
+    xlab("Average nFeature_RNA per cell per FOV") + 
+    geom_vline(xintercept = floor(nFeature_RNA_min), lty = 2) +
+    theme_classic(base_size = font_size) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+
+### Per group (log-scale)
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(nFeature_RNA) |>
+    ggplot(aes(x = nFeature_RNA, y = group, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
+    #geom_jitter(width = 0, height = 0.1, size = 0.2) +
+    xlab("Average nFeature_RNA per cell per FOV") + 
+    geom_vline(xintercept = floor(nFeature_RNA_min), lty = 2) +
+    theme_classic(base_size = font_size) +
+    scale_x_log10() +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+
+### nCount (transcripts) vs. nFeature (probes)
+
+```{r, out.width="80%"}
+spx_meta |> 
+  ggplot(aes(x=nCount_RNA, y=nFeature_RNA#, color=patient_id
+  )) + 
+  geom_point(size = 0.5) + 
+  stat_smooth(method=lm) +
+  scale_x_log10() + 
+  scale_y_log10() + 
+  theme_classic() +
+  geom_vline(xintercept = nCount_RNA_min, col = "red") + 
+  geom_hline(yintercept = nFeature_RNA_min, col = "red") + 
+  ggtitle("Probes vs. Transcripts") +
+  facet_wrap(~slide_id) +
+  xlab("nCount_RNA (log10 scale)")
+```
+
+***
+
+## Proportion of negative counts {.tabset}
+
+Centrality metrics for `percentNegCounts` (before QC) across different groups:
+
+```{r}
+spx_meta |>
+  group_by(group) |>
+  summarise(mean_percentNegCounts = round(mean(percentNegCounts), 1),
+            q05_perccentNegCounts = round(quantile(percentNegCounts, 0.05), 1))
+```
+
+***
+
+```{r}
+percentNegCounts_max <- max(spx_meta$percentNegCounts[spx_meta$qcFlagCell_summary == "Pass"])
+print(paste0("Highest `percentNegCounts` per cell in cells that passed QC: ", 
+             round(percentNegCounts_max, 3)))
+```
+
+***
+
+Pass/Fail summary, per condition of interest:
+
+```{r}
+all_groups <- round(table(spx_meta$qcFlagCell_percentNeg) / nrow(spx_meta) * 100, 1)
+t <- table(spx_meta$group, spx_meta$qcFlagCell_percentNeg)
+t <- round(t / rep(table(spx_meta$group), 2) * 100, 1)
+
+df <- rbind(all_groups, t)
+df
+```
+
+
+### Per sample
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(percentNegCounts) |>
+    ggplot(aes(x = percentNegCounts, y = sample_name, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
+    #geom_jitter(width = 0, height = 0.1, size = 0.2) +
+    xlab("Average percentNegCounts per cell per FOV") + 
+    geom_vline(xintercept = floor(percentNegCounts_max), lty = 2) +
+    theme_classic(base_size = font_size) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+
+### Per group
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(percentNegCounts) |>
+    ggplot(aes(x = percentNegCounts, y = group, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
+    #geom_jitter(width = 0, height = 0.1, size = 0.2) +
+    xlab("Average percentNegCounts per cell per FOV") + 
+    geom_vline(xintercept = floor(percentNegCounts_max), lty = 2) +
+    theme_classic(base_size = font_size) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+
+### Per group (log-scale)
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(percentNegCounts) |>
+    ggplot(aes(x = percentNegCounts, y = group, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
+    #geom_jitter(width = 0, height = 0.1, size = 0.2) +
+    xlab("Average percentNegCounts per cell per FOV") + 
+    geom_vline(xintercept = floor(percentNegCounts_max), lty = 2) +
+    theme_classic(base_size = font_size) +
+    scale_x_log10() +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+
+
+## Cell complexity {.tabset}
+
+The total counts (transcripts) must exceed the number of detected probes (genes) in the cell, i.e. `nCount_RNA` / `nFeature_RNA` > 1
+
+***
+
+Centrality metrics for `complexity` (before QC) across different groups:
+
+```{r}
+spx_meta |>
+  group_by(group) |>
+  summarise(mean_complexity = round(mean(complexity, na.rm = TRUE), 1),
+            median_complexity = round(median(complexity, na.rm = TRUE), 1),
+            q05_complexity = round(quantile(complexity, 0.05, na.rm = TRUE), 1),
+            q95_complexity = round(quantile(complexity, 0.95, na.rm = TRUE), 1))
+```
+
+***
+
+```{r}
+#spx_meta[is.na(spx_meta$complexity), ]  # one cell with only neg probes
+complexity_min <- min(spx_meta$complexity[spx_meta$qcFlagCell_summary == "Pass"], na.rm = TRUE)
+print(paste0("Lowest `complexity` per cell in cells that passed QC: ", 
+             round(complexity_min, 3)))
+```
+
+***
+
+Pass/Fail summary, per condition of interest:
+
+```{r}
+all_groups <- round(table(spx_meta$qcFlagCell_complex) / nrow(spx_meta) * 100, 1)
+t <- table(spx_meta$group, spx_meta$qcFlagCell_complex)
+t <- round(t / rep(table(spx_meta$group), 2) * 100, 1)
+
+df <- rbind(all_groups, t)
+df
+```
+
+
+### Per sample
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(complexity) |>
+    ggplot(aes(x = complexity, y = sample_name, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
+    #geom_jitter(width = 0, height = 0.1, size = 0.2) +
+    xlab("Average complexity per cell per FOV") + 
+    geom_vline(xintercept = floor(complexity_min), lty = 2) +
+    theme_classic(base_size = font_size) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+***
+***
+
+### Per group
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(complexity) |>
+    ggplot(aes(x = complexity, y = group, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
+    #geom_jitter(width = 0, height = 0.1, size = 0.2) +
+    xlab("Average complexity per cell per FOV") + 
+    geom_vline(xintercept = floor(complexity_min), lty = 2) +
+    theme_classic(base_size = font_size) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+***
+***
+
+### Per group (log-scale)
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(complexity) |>
+    ggplot(aes(x = complexity, y = group, fill = group)) +
+    geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
+    #geom_jitter(width = 0, height = 0.1, size = 0.2) +
+    xlab("Average complexity per cell per FOV") + 
+    geom_vline(xintercept = floor(complexity_min), lty = 2) +
+    theme_classic(base_size = font_size) +
+    scale_x_log10() +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    theme(legend.position = "none")
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
+```
+
+***
+***
+***
+
+
+# Conclusion on cell QC
+
+In summary, `spatialhub` flags a cell as passing QC if it fulfills all of the following criteria:
+
+- `nCount_RNA` (total transcripts) >= 20, or user-specified threshold;
+- `nFeature_RNA` (distinct probes) >= 5, or user-specified threshold;
+- `percentNegCounts` (proportion of counts from negative control probes) < 5%, or user-specified threshold;
+- `complexity` (transcripts per probe) > 1, or user-specified threshold;
+
+Following cell (and if applicable, FOV) QC, **`spatialhub` flags a _sample_ as passing QC if it fulfills both of the following criteria**:
+
+- The number of cells left for that sample after excluding low-quality cells and low-quality FOVs is above the user-specified threshold (recommendation varies greatly by sample are);
+- The percentage of cells left for that sample after excluding low-quality cells and low-quality FOVs is >50%, or user-specified threshold.
+
+**Important note: If applying QC filters as defined above, low-quality FOVs will _not_ be excluded (unless they led to the exclusion of the sample as a whole).** We have found that cells within these FOVs are not necessarily harder to annotate than others using label transfer approaches, and can thus be considered in analyses relying on cell types (e.g. compositional analyses, spatial metrics between cell types...); **however, cells in these FOVs should be removed from analyses such as differential gene expression and any other analysis where they show a different behavior (e.g. de novo clustering).**
+
+
+## Spatial plot flagging Pass/Fail {.tabset}
+
+### low-quality cells highlighted
+
+```{r}
+spx_meta$qcFlagCell_summary <- factor(as.character(spx_meta$qcFlagCell_summary), levels = c("Pass", "Fail"))
+
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(qcFlagCell_summary) |> 
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = qcFlagCell_summary)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_manual(values = alpha(c("grey70", "red2"), 0.5)) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed() + theme(legend.position = 'none')
+  
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+***
+
+### low-quality samples flagged
+
+```{r}
+spx_meta$qcFlagSample_summary <- factor(as.character(spx_meta$qcFlagSample_summary), levels = c("Pass", "Fail"))
+
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::arrange(qcFlagSample_summary) |> 
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = qcFlagSample_summary)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_manual(values = alpha(c("grey70", "red2"), 0.5)) +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed() + theme(legend.position = 'none')
+  
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+***
+
+### low-quality cells and samples removed
+
+```{r}
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    dplyr::filter(qcFlagCell_summary == "Pass") |> 
+    dplyr::filter(qcFlagSample_summary == "Pass") |> 
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = qcFlagCell_summary)) +
+    geom_point(size = 0.02) + theme_classic(base_size = 14) +
+    scale_color_manual(values = alpha(c("grey60"), 0.8)) +
+    coord_fixed() + theme(legend.position = 'none')
+  
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+``` 
+
+***
+
+
+## Summary metrics in filtered dataset {.tabset}
+
+**Per-sample metrics**:
+
+```{r}
+qc_vars <- names(qc_sample)
+qc_vars <- c("sample_index", "group",
+             "nCell_sampleSum", "nCell_sampleSum_passQC", "samplePercentCellsPassQC",
+             "samplePercentCellsInFailedFOV", "qcFlagSample_summary",
+             qc_vars[grep("sampleSum", qc_vars)], qc_vars[grep("sampleAvg", qc_vars)])
+qc_vars <- unique(qc_vars[qc_vars %in% names(qc_sample)])
+qc_sample |>
+  dplyr::select(all_of(qc_vars)) |>
+  dplyr::arrange(desc(nCell_sampleSum_passQC))
+```
+
+***
+
+Or, in summary:
+
+```{r}
+print("Percentage of cells passing QC:")
+spx_meta$qc_summary <- ifelse(spx_meta$qcFlagCell_summary == "Pass" & spx_meta$qcFlagSample_summary == "Pass", "Pass", "Fail")
+
+all_groups <- round(table(spx_meta$qc_summary) / nrow(spx_meta) * 100, 1)
+t <- table(spx_meta$group, spx_meta$qc_summary); t <- round(t / rep(table(spx_meta$group), 2) * 100, 1)
+
+df <- rbind(all_groups, t)
+df
+```
+
+***
+
+```{r}
+print("Number of cells passing QC:")
+all_groups <- table(spx_meta$qc_summary)
+t <- table(spx_meta$group, spx_meta$qc_summary)
+
+df <- rbind(all_groups, t)
+df
+```
+
+***
+
+After excluding low-quality cells, the distribution of number of transcripts (`nCount_RNA`) and distinct probes (`nFeature_RNA`) detected per cell looks like this:
+
+```{r}
+filtered_meta <- spx_meta |> dplyr::filter(qc_summary == "Pass") 
+filtered_meta |>
+  group_by(group) |>
+  summarise(mean_nCount_RNA = mean(nCount_RNA), mean_nFeature_RNA = mean(nFeature_RNA),
+            median_nCount_RNA = median(nCount_RNA), median_nFeature_RNA = median(nFeature_RNA))
+```
+
+
+## density plot - `nCount_RNA`
+
+```{r, out.width="80%", fig.height=6L}
+filtered_meta |>
+  dplyr::filter(qc_summary == "Pass") |>
+  ggplot(aes(x = nCount_RNA, color = slide_id, fill =  slide_id)) + 
+  geom_density(alpha = 0.2) + 
+  scale_x_log10() + 
+  theme_classic() +
+  ylab("Cell density") +
+  geom_vline(xintercept = median(filtered_meta$nCount_RNA), lty = 1) +
+  geom_vline(xintercept = mean(filtered_meta$nCount_RNA), lty = 2) +
+  ggtitle(paste0("Total transcripts per cell")) +
+  facet_wrap(. ~ group) +
+  NULL
+```
+
+***
+***
+***
+
+## density plot - `nFeature_RNA`
+
+```{r, out.width="80%", fig.height=6L}
+filtered_meta |>
+  dplyr::filter(qc_summary == "Pass") |>
+  ggplot(aes(x = nFeature_RNA, color = slide_id, fill =  slide_id)) + 
+  geom_density(alpha = 0.2) + 
+  scale_x_log10() + 
+  theme_classic() +
+  ylab("Cell density") +
+  geom_vline(xintercept = median(filtered_meta$nFeature_RNA), lty = 1) +
+  geom_vline(xintercept = mean(filtered_meta$nFeature_RNA), lty = 2) +
+  ggtitle(paste0("Total transcripts per cell")) +
+  facet_wrap(. ~ group) +
+  NULL
+```
+
+***
+***
+***
+
+
+
+### Total counts and distinct probes per cell (post-QC): per-sample Zoom {.tabset}
+
+```{r}
+gg_ls <- list() 
+
+for (sample in unique(filtered_meta$sample_index)) {
+  
+  spx_sample <- filtered_meta |>
+    dplyr::filter(sample_index == sample)
+  nCells_sample <- unique(spx_sample$nCell_sampleSum_passQC)
+  
+  col_max <- signif(max(spx_sample$nCount_RNA) * 2/3, 2)
+  g1 <- spx_sample |>  
+    dplyr::arrange(nCount_RNA) |> 
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = nCount_RNA)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_gradient(low = "grey75", high = "blue",
+                         limits = c(0, col_max), oob = scales::squish) +
+    ggtitle(paste0("Cell count (pre-QC): ", nCells_sample)) + 
+    theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed()
+  
+  col_max <- signif(max(spx_sample$nFeature_RNA) * 2/3, 2)
+  g2 <- spx_sample |>  
+    dplyr::arrange(nFeature_RNA) |> 
+    ggplot(aes(x = CenterX_global_px, y = CenterY_global_px, color = nFeature_RNA)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_gradient(low = "grey75", high = "blue",
+                         limits = c(0, col_max), oob = scales::squish) +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed()
+  
+  gg_ls[[sample]] <- (g1 | g2)
+  
+}
+```
+
+```{r, results = 'asis'}
+for(i in 1:length(gg_ls)) {
+  
+  cat("#### ", names(gg_ls)[i], "\n")
+
+  cat("\n")
+  print(gg_ls[[i]])
+  cat("\n")
+  cat("\n")
+  
+} 
+```
+
+
+# R session
+
+```{r}
+sessionInfo()
+```
