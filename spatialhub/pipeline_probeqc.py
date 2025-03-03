@@ -170,10 +170,10 @@ def calculateQCmetrics(infile, outfile):
 
 
 
-@active_if(PARAMS["compile_reports"] and PARAMS["runFOVqc"])
+@active_if(PARAMS["compile_reports"] and PARAMS["FOV_runQC"])
 @transform(calculateQCmetrics,
            regex(r"(.*)/(.*).sentinel"),
-           r"\1/\2_reports.sentinel")
+           r"\1/\2_FOV_report.sentinel")
 def compileFOVreport(infile, outfile):
     '''
     Compile R markdown report for easy lookup of FOV-level QC metrics
@@ -208,10 +208,10 @@ def compileFOVreport(infile, outfile):
 
 
 
-@active_if(PARAMS["compile_reports"] and PARAMS["runFOVqc"])
+@active_if(PARAMS["compile_reports"])
 @transform(calculateQCmetrics,
            regex(r"(.*)/(.*).sentinel"),
-           r"\1/\2_reports.sentinel")
+           r"\1/\2_cell_report.sentinel")
 def compileCellReport(infile, outfile):
     '''
     Compile R markdown report for easy lookup of cell-level QC metrics
