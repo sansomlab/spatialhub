@@ -160,7 +160,7 @@ def calculateQCmetrics(infile, outfile):
                    --cell_complexity_cutoff=%(filtering_cell_complexity_cutoff)s
                    --sampleMinCells=%(filtering_sample_min_cells_passQC)s
                    --sampleMinPercent=%(filtering_sample_min_percent_passQC)s
-                   %(rmCellsInFailedFOVs)%
+                   %(rmCellsInFailedFOVs)s
                    &> %(log_file)s
                 ''' % dict(PARAMS, **t.var, **locals())
     
