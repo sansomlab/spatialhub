@@ -106,6 +106,11 @@ option_list <- list(
         c("--sampleMinPercent"),
         default = 50,
         help="minimum percent of cells from a sample that must pass QC for that sample to be retained"
+    ),
+    make_option(
+        c("--rmCellsInFailedFOVs"),
+        default = FALSE,
+        help="exclude cells located in a low-quality FOV, regardless of the individual quality metrics for this cell"
     )
 )
 
@@ -559,8 +564,25 @@ sample_qc_vars <- names(dfs)
 # Note: This summary requires integration of QC metrics across all (available) levels
 dfa <- plyr::join(dfc, dfs, by = intersect(names(dfc), names(dfs)))
 
-if (opt$runFOVqc) {
 
+# Tally the cells that passed *cell* QC for each sample
+dfa_ls <- split(dfa, f = dfa$sample_index)
+
+for (sample in names(dfa_ls)) { 
+  df <- dfa_ls[[sample]]
+    
+  # In summary, how many cells for that sample pass QC?
+  # i.e. how many cells have enough counts, etc.
+  sample_cell_pass_qc <- df$qcFlagCell_summary == "Pass"
+  df$nCell_sampleSum_passQC <- sum(sample_cell_pass_qc)
+
+  dfa_ls[[sample]] <- df
+}
+dfa <- do.call(rbind.data.frame, dfa_ls)
+
+
+# Tally the cells that pased *cell* AND *FOV* QC for each sample
+if (opt$runFOVqc) {
   dfa <- plyr::join(dfa, dfov, by = intersect(names(dfa), names(dfov)))
 
   # Define sample-level FOV QC pass/fail
@@ -574,49 +596,48 @@ if (opt$runFOVqc) {
     #r <- length(unique(df$fov[df$qcFlagsFOV_summary == "Fail"]))
     #df$samplePercentFailedFOVs <- round(r / length(unique(df$fov)), 3) * 100
     
-    # In summary, how many cells for that sample pass QC?
+    # In summary, how many cells for that sample pass all QC?
     # i.e. how many cells have enough counts, etc. AND fall within a high-qaulity FOV
     sample_cell_pass_qc <- df$qcFlagCell_summary == "Pass" &
       df$qcFlagFOV_summary == "Pass"
-    df$nCell_sampleSum_passQC <- sum(sample_cell_pass_qc)
+    df$nCellxnFOV_sampleSum_passQC <- sum(sample_cell_pass_qc)
 
     dfa_ls[[sample]] <- df
   }
   dfa <- do.call(rbind.data.frame, dfa_ls)
-  
-} else {
-
-  # Tally the cells that passed QC for each sample
-  dfa_ls <- split(dfa, f = dfa$sample_index)
-
-  for (sample in names(dfa_ls)) { 
-    df <- dfa_ls[[sample]]
-    
-    # In summary, how many cells for that sample pass QC?
-    # i.e. how many cells have enough counts, etc.
-    sample_cell_pass_qc <- df$qcFlagCell_summary == "Pass"
-    df$nCell_sampleSum_passQC <- sum(sample_cell_pass_qc)
-
-    dfa_ls[[sample]] <- df
-  }
-  dfa <- do.call(rbind.data.frame, dfa_ls)
-
 }
 
-# Define summary sample QC metric
-# i.e. sample with a minimum absolute count of cells and percent of cells passing QC
-dfa$samplePercentCellsPassQC <- round(dfa$nCell_sampleSum_passQC/dfa$nCell_sampleSum, 3) * 100
-sample_pass_qc <- dfa$nCell_sampleSum_passQC >= opt$sampleMinCells &
-  dfa$samplePercentCellsPassQC > opt$sampleMinPercent
-dfa$qcFlagSample_summary <- ifelse(sample_pass_qc, "Pass", "Fail")
+
+if (opt$rmCellsInFailedFOVs) {
+
+  # Define summary sample QC metric
+  # i.e. sample with a minimum absolute count of cells and percent of cells passing QC
+  # based on cell QC and FOV QC both
+  dfa$samplePercentCellsPassQC <- round(dfa$nCellxnFOV_sampleSum_passQC/dfa$nCell_sampleSum, 3) * 100
+  sample_pass_qc <- dfa$nCellxnFOV_sampleSum_passQC >= opt$sampleMinCells &
+    dfa$samplePercentCellsPassQC > opt$sampleMinPercent
+  dfa$qcFlagSample_summary <- ifelse(sample_pass_qc, "Pass", "Fail")
+
+} else {
+
+  # Define summary sample QC metric
+  # i.e. sample with a minimum absolute count of cells and percent of cells passing QC
+  # based on cell QC only
+
+  dfa$samplePercentCellsPassQC <- round(dfa$nCell_sampleSum_passQC/dfa$nCell_sampleSum, 3) * 100
+  sample_pass_qc <- dfa$nCell_sampleSum_passQC >= opt$sampleMinCells &
+    dfa$samplePercentCellsPassQC > opt$sampleMinPercent
+  dfa$qcFlagSample_summary <- ifelse(sample_pass_qc, "Pass", "Fail")
+
+}
 
 
 ## 3D: Save sample-level QC metrics
 
 # Reducing data frame back again to one row per sample
 keepVar <- sort(which(names(dfa) %in% c(sample_qc_vars, 
-                  "nCell_sampleSum_passQC", "samplePercentCellsPassQC",
-                  "samplePercentCellsInFailedFOV",
+                  "samplePercentCellsPassQC", "nCell_sampleSum_passQC", 
+                  "samplePercentCellsInFailedFOV", "nCellxnFOV_sampleSum_passQC",
                   "qcFlagSample_summary")
                   )
                 )

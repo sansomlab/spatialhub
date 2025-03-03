@@ -40,14 +40,6 @@ library(tidyverse)
 ```{r graphical_params, child="_graphical_params.Rmd", eval=file.exists("_graphical_params.Rmd")}
 ```
 
-```{r, echo=FALSE}
-# Adjust the following parameters depending on the number of slides to display in one plot
-plot_ncol_spatial <- 4
-plot_ncol <- 2
-font_size <- 10
-legend_size <- 3
-```
-
 ```{r header, child="probeqc_header.Rmd", eval=file.exists("probeqc_header.Rmd")}
 ```
 

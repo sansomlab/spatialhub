@@ -11,6 +11,15 @@ fov_qc_file <- grep("_fovQCmetrics.csv", probeqc_files)  # "*_fovQCmetrics.csv" 
 x <- "condition"
 ```
 
+```{r, echo=FALSE}
+# Adjust the following parameters depending on the number of slides to display in one plot
+# (alongside figure size in _graphical_parmas.Rmd)
+plot_ncol_spatial <- 4
+plot_ncol <- 2
+font_size <- 10
+legend_size <- 3
+```
+
 
 # Overview
 

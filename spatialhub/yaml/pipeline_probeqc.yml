@@ -26,7 +26,7 @@ probes:
     poscontrol: System    # Default positive control probe name for CosMx
 
 # Path to a .csv table describing custom probes, if applicable
-custom_panel: True
+custom_panel: False
 custom_probes_table: /users/sansom/tme871/work/cosmx_mouse/metadata/1K_Oxford_Sansom_1-clean.csv
 
 
@@ -34,12 +34,12 @@ custom_probes_table: /users/sansom/tme871/work/cosmx_mouse/metadata/1K_Oxford_Sa
 # ---------------
 
 FOV:
-    runQC: True  # Whether to run FOV-level QC at all (can be turned off if no FOV data available)
+    runQC: False  # Whether to run FOV-level QC at all (can be turned off if no FOV data available)
     average_nCount_cutoff: 50
     SNR_cutoff: 3
     
 bruker:
-    runQC: True  # Whether to run FOV QC tool from Bruker to detect instrument failures with CosMx (requires FOV_runQC to be True)
+    runQC: False  # Whether to run FOV QC tool from Bruker to detect instrument failures with CosMx (requires FOV_runQC to be True)
     code: /gpfs3/well/sansom/users/tme871/devel/spatialhub/R/bruker_FOV_QC_utils.R
     data: /gpfs3/well/sansom/users/tme871/devel/spatialhub/data/bruker_barcodes_panel.RDS
 
@@ -58,6 +58,10 @@ filtering:
     cell_complexity_cutoff: 1
     sample_min_cells_passQC: 2500
     sample_min_percent_passQC: 50
+    sample_remove_failed_FOVs: False  
+        # when tallying cells to finalize sample-level QC
+        # whether to consider *cell* filters only or *cell* and *FOV* both
+    
 
 
 # R Markdown reports

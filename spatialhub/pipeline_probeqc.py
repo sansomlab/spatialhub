@@ -136,6 +136,11 @@ def calculateQCmetrics(infile, outfile):
          runBrukerFOVqc = "--runBrukerFOVqc=FALSE"
          brukerCodeFile = "--brukerCodeFile=''"
          brukerDataFile = "--brukerDataFile=''"
+
+    if PARAMS["filtering_sample_remove_failed_FOVs"]:
+         rmCellsInFailedFOVs = "--rmCellsInFailedFOVs=TRUE"
+    else:
+         rmCellsInFailedFOVs = "--rmCellsInFailedFOVs=FALSE"
     
     statement = '''Rscript %(spatialhub_code_dir)s/R/probeqc_calculate_metrics.R 
                    --path2sce=%(matrix_file)s
@@ -155,6 +160,7 @@ def calculateQCmetrics(infile, outfile):
                    --cell_complexity_cutoff=%(filtering_cell_complexity_cutoff)s
                    --sampleMinCells=%(filtering_sample_min_cells_passQC)s
                    --sampleMinPercent=%(filtering_sample_min_percent_passQC)s
+                   %(rmCellsInFailedFOVs)%
                    &> %(log_file)s
                 ''' % dict(PARAMS, **t.var, **locals())
     
