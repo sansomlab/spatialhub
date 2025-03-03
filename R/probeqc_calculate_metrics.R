@@ -292,7 +292,7 @@ if (nchar(opt$customPanel) > 0) {
 } else {
   df$nCount_RNA <- df$nCount_ucc
   df$nFeature_RNA <- df$nFeature_ucc
-  df <- df |> dplyr::select(-nCount_ucc, -nFeature_uc)
+  df <- df |> dplyr::select(-nCount_ucc, -nFeature_ucc)
   n_probes <- nrow(counts_ucc)
 }
 
