@@ -178,7 +178,7 @@ sce_meta <- as.data.frame(colData(sce))
 sce_meta$cell_index <- colnames(sce)
 sce_meta <- sce_meta |> dplyr::select(cell_index, everything())
 
-matching_vars <- intersect(names(colData(sce)), names(fov2sample))
+matching_vars <- intersect(names(sce_meta), names(fov2sample))
 spx_meta <- plyr::join(sce_meta, fov2sample, by = matching_vars)
 rownames(spx_meta) <- spx_meta$cell_index
 
@@ -409,7 +409,7 @@ if (opt$runFOVqc) {
 
     # Initiate relevant variables
     dfov$sample_key <- paste0(as.character(dfov$slide_id), "_", as.character(dfov$sample_name))
-    dfov$qcFlagInstr <- dfov$qcFlagGeneBias <- NA
+    dfov$brukerFOVqc <- dfov$qcFlagInstr <- dfov$qcFlagGeneBias <- NA
     
     # Source functions and barcodes from Bruker Spatial Biology: https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/FOV%20QC
     source(opt$brukerCode)
@@ -443,6 +443,9 @@ if (opt$runFOVqc) {
         failedFOVs <- res_fov_qc[[sample]]$flaggedfovs; biasFOVs <- res_fov_qc[[sample]]$flaggedfovs_forbias
         dfov$qcFlagInstr[dfov$sample_key == sample] <- ifelse(dfov$fov[dfov$sample_key == sample] %in% failedFOVs, "Fail", "Pass")
         dfov$qcFlagGeneBias[dfov$sample_key == sample] <- ifelse(dfov$fov[dfov$sample_key == sample] %in% biasFOVs, "Fail", "Pass")
+        if ("sample_qc" %in% names(res_fov_qc[[sample]])) {
+          dfov$brukerFOVqc <- res_fov_qc[[sample]]$sample_qc
+        }
 
       } else {
         unassigned_fovs <- unique(colData(sce_ls[[sample]])[, "fov"])
