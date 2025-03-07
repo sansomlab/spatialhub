@@ -13,7 +13,7 @@ matrix_file: /users/sansom/tme871/work/cosmx_mouse/spatialhub/anndata.dir/mouse_
 # (see documentation for deta
 sample_table: /users/sansom/tme871/work/cosmx_mouse/metadata/mouse_ibd_hh_spatialhub_samples.tsv 
 
-# Allocated memory (requirements depends on size of input matrix)
+# Allocated memory (requirements depend on size of input matrix)
 mem: 8G
 
 

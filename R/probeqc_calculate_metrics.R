@@ -409,7 +409,8 @@ if (opt$runFOVqc) {
 
     # Initiate relevant variables
     dfov$sample_key <- paste0(as.character(dfov$slide_id), "_", as.character(dfov$sample_name))
-    dfov$brukerFOVqc <- dfov$qcFlagInstr <- dfov$qcFlagGeneBias <- NA
+    #dfov$brukerFOVqc <- NA
+    dfov$qcFlagInstr <- dfov$qcFlagGeneBias <- NA
     
     # Source functions and barcodes from Bruker Spatial Biology: https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/FOV%20QC
     source(opt$brukerCode)
@@ -434,18 +435,18 @@ if (opt$runFOVqc) {
 
         print(paste0("Checking instrument failures for sample ", sample))
         res_fov_qc[[sample]] <- runFOVQC(counts = t(assay(sce_ls[[sample]])), 
-                                        xy = data.frame(colData(sce_ls[[sample]])[, c("CenterX_global_px", "CenterY_global_px")]),
-                                        fov = colData(sce_ls[[sample]])[, "fov"], 
-                                        barcodemap = barcodes,  # REMINDER: this only considers probes in the custom panel (including Negative)
-                                        max_prop_loss = 0.6, max_totalcounts_loss = 0.6)  # default 0.6, the higher, the more relaxed the QC
+                                         xy = data.frame(colData(sce_ls[[sample]])[, c("CenterX_global_px", "CenterY_global_px")]),
+                                         fov = colData(sce_ls[[sample]])[, "fov"], 
+                                         barcodemap = barcodes,  # REMINDER: this only considers probes in the custom panel (including Negative)
+                                         max_prop_loss = 0.6, max_totalcounts_loss = 0.6)  # default 0.6, the higher, the more relaxed the QC
         
         # Append to QC metrics dataset for the corresponding slide x sample
         failedFOVs <- res_fov_qc[[sample]]$flaggedfovs; biasFOVs <- res_fov_qc[[sample]]$flaggedfovs_forbias
         dfov$qcFlagInstr[dfov$sample_key == sample] <- ifelse(dfov$fov[dfov$sample_key == sample] %in% failedFOVs, "Fail", "Pass")
         dfov$qcFlagGeneBias[dfov$sample_key == sample] <- ifelse(dfov$fov[dfov$sample_key == sample] %in% biasFOVs, "Fail", "Pass")
-        if ("sample_qc" %in% names(res_fov_qc[[sample]])) {
-          dfov$brukerFOVqc <- res_fov_qc[[sample]]$sample_qc
-        }
+        #if ("sample_qc" %in% names(res_fov_qc[[sample]])) {
+        #  dfov$brukerFOVqc <- res_fov_qc[[sample]]$sample_qc
+        #}
 
       } else {
         unassigned_fovs <- unique(colData(sce_ls[[sample]])[, "fov"])

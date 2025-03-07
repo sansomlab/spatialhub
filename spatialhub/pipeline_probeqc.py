@@ -218,7 +218,7 @@ def compileCellReport(infile, outfile):
     '''
 
     t = T.setup(infile, outfile, PARAMS,
-                memory=8,
+                memory=16,
                 cpu=1)
 
     if not os.path.exists("probeqc.dir/probeqc_header.Rmd"):

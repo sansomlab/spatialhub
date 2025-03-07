@@ -21,6 +21,7 @@ output:
 knitr::opts_chunk$set(message = FALSE, warning = FALSE, error = TRUE,
                       prompt = FALSE, cache = FALSE, tidy = FALSE)
 set.seed(123456789)
+report <- "cellQC"
 ```
 
 ```{r libraries}
