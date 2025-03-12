@@ -32,6 +32,9 @@ blessed
 ashlar
 torch
 'spatialdata[extra]'
+'sopa[cellpose,baysor,wsi]'
+'dask[complete]'
+scvi-tools
 
 
 ### DRAFT requirements TBC ###
@@ -41,7 +44,6 @@ notebook
 'scanpy[leiden]'
 torch
 tf-keras
-scvi-tools
 harmonypy
 scikit-misc
 sccoda
@@ -50,4 +52,3 @@ tiffslide_xarray
 'cellpose[gui]'
 'scikit-image[optional]'
 patchify
-'sopa[cellpose,baysor]'
