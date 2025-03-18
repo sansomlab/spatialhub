@@ -3,6 +3,10 @@ spatialhub.egg-info/
 __pycache__/
 .DS_Store
 
+# Script archive folders
+R/archive/
+python/archive/
+
 # History files
 .Rhistory
 .Rapp.history
