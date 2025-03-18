@@ -1,0 +1,65 @@
+#
+# Pipeline pipeline_scanvi.py configuration file
+# ==================================================
+#
+
+# General options
+# ---------------
+
+# Path to .h5ad or .rds file containing the counts matrix for annotation
+matrix_file: /users/sansom/tme871/work/cosmx_mouse/spatialhub/anndata.dir/mouse_ibd_hh_atomx.h5ad 
+    # needs normalized data slot if using CellTypist, raw data for scANVI
+
+# Location of the samples.tsv and atlas.tsv table
+# (see documentation for details)
+sample_table: /users/sansom/tme871/work/cosmx_mouse/metadata/mouse_ibd_hh_spatialhub_samples.tsv 
+atlas_table: /users/sansom/tme871/work/cosmx_mouse/metadata/mouse_ibd_hh_spatialhub_atlas.tsv
+
+# Necessary memory to work with reference atlases and spatial datasets
+mem_atlas: 24
+mem_spx: 36
+
+
+# Reference atlas pre-processing options
+# ---------------
+
+simplify_metadata: False  # wheter to reduce the metadata to its minimal necessary covariates (as listed in atlas table)
+annothub_directory: /users/sansom/tme871/devel/spatialhub/data/AnnotHub_databases/ # path to set of reference Ensembl annotation TSV tables
+
+
+# Probe panel specific options
+# ---------------
+
+# Table specifying how panel probe names match to gene symbols from Ensembl annotations
+# Use one of the provided one, or create your own if using a custom panel
+probes_mapping: /users/sansom/tme871/work/cosmx_mouse/metadata/cosmx_mouse_custom_1k_ensembl_mapping.csv
+
+
+# scANVI options
+# ---------------
+
+run_scanvi: True
+
+scanvi:
+  mem: 16
+  cpus: 8
+  hvg_batch: None  # batch key to re-run HVG selection, if no HVG provided in input atlas
+  scvi_pretrain: True  # whether to pre-train an scVI model before training an scANVI one (recommended)
+  feature_set: both  # whether to use hvg, probes or both
+
+
+
+# CellTypist options
+# ---------------
+
+run_celltypist: False
+
+ct:
+  model: 'Adult_Mouse_Gut'
+  mode: 'best match'  # use 'prob match' for something more flexible
+  majority_voting: False 
+    # considerably speeds things up if False, although True usually improves classification
+    # (if True, we recommend providing an AnnData with a pre-calculated neighbor graph)
+  min_prop: 0.2
+    # minimum proportion of dominant cell type in a subcluster (for majority voting) for it to be labelled as this cell type
+  #subset_to_hvg: (?)

@@ -18,7 +18,7 @@ pysam
 cgatcore  # skip - already installed via GitHub
 cgatcore.iotools  # skip - already installed via GitHub
 
-# spatial pipeline requirements
+# spatial/scRNA-seq pipeline requirements
 tifffile
 imagecodecs
 scipy
@@ -35,6 +35,8 @@ torch
 'sopa[cellpose,baysor,wsi]'
 'dask[complete]'
 scvi-tools
+celltypist
+notebook
 
 
 ### DRAFT requirements TBC ###
