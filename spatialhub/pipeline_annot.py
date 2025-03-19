@@ -97,7 +97,7 @@ if len(sys.argv) > 1:
 if len(sys.argv) > 1:
     if sys.argv[1] == "make":
         
-        S = samples.samples(sample_tsv = PARAMS["sample_table"])
+        #S = samples.samples(sample_tsv = PARAMS["sample_table"])
         A = samples.atlases(atlas_tsv = PARAMS["atlas_table"])
         
         if not os.path.exists("annot.dir"):
@@ -171,18 +171,12 @@ def scanviTrainModel(infile, outfile):
                 cpu=PARAMS['scanvi_cpus'])
     
     scviWorkers = '--scviNumWorkers=' + str(PARAMS['scanvi_cpus'] - 1)
-
-    if PARAMS['scanvi_hvg_batch'] != 'None':
-         batchKey_hvg = '--batchKey_hvg=""'
-    else:
-         batchKey_hvg = '--batchKey_hvg=' + PARAMS['scanvi_hvg_batch']
     
     statement = '''python %(spatialhub_code_dir)s/python/annot_scanvi_train.py
                     --atlasKey=%(input_ref)s
                     --atlasTSV=%(atlas_table)s
                     --featureSet=%(scanvi_feature_set)s
                     --probesMapping=%(probes_mapping)s
-                    %(batchKey_hvg)s
                     %(scviWorkers)s
                     --scVI_pretrain=%(scanvi_scvi_pretrain)s
                    &> %(log_file)s
@@ -192,26 +186,31 @@ def scanviTrainModel(infile, outfile):
     IOTools.touch_file(outfile)
 
 
-#@transform(scanviTrainModel,
-#           regex(r"(.*)/(.*)_scanviTrain.sentinel"),
-#           r"\1/\2_scanviPredict.sentinel")
-#def scanviPredictAnnot(infile, outfile):
-#    '''
-#    Predict cell type annotations from provided reference
-#    '''
-#
-#    input_ref = os.path.basename(outfile)[:-len("_scanviPredict.sentinel")]
-#
-#    t = T.setup(infile, outfile, PARAMS,
-#                memory=16,
-#                cpu=8)
-#    
-#    statement = '''python %(spatialhub_code_dir)s/python/scanvi_predict_celltypes.py 
-#                   &> %(log_file)s
-#                ''' % dict(PARAMS, **t.var, **locals())
-#    
-#    P.run(statement, **t.resources)
-#    IOTools.touch_file(outfile)
+@transform(scanviTrainModel,
+           regex(r"(.*)/(.*)_scanviTrain.sentinel"),
+           r"\1/\2_scanviPredict.sentinel")
+def scanviPredictAnnot(infile, outfile):
+    '''
+    Predict cell type annotations from provided reference
+    '''
+
+    input_ref = os.path.basename(outfile)[:-len("_scanviPredict.sentinel")]
+
+    t = T.setup(infile, outfile, PARAMS,
+                memory=PARAMS['scanvi_mem'],
+                cpu=PARAMS['scanvi_cpus'])
+    
+    scviWorkers = '--scviNumWorkers=' + str(PARAMS['scanvi_cpus'] - 1)
+    
+    statement = '''python %(spatialhub_code_dir)s/python/annot_scanvi_predict.py
+                    --atlasKey=%(input_ref)s
+                    --atlasTSV=%(atlas_table)s
+                    %(scviWorkers)s
+                   &> %(log_file)s
+                ''' % dict(PARAMS, **t.var, **locals())
+    
+    P.run(statement, **t.resources)
+    IOTools.touch_file(outfile)
 
 
 # Add task to harmonize annotations generated from different databases
@@ -219,7 +218,7 @@ def scanviTrainModel(infile, outfile):
 
 # --------------------- < generic pipeline tasks > -------------------------- #
 
-@follows(scanviTrainModel)
+@follows(scanviPredictAnnot)
 def full():
     pass
 

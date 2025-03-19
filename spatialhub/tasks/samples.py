@@ -34,7 +34,7 @@ def check_values(pd_frame, col, allowed):
 
     if not all([x in allowed for x in pd_frame[col].values]):
         raise ValueError("Only the following values are supported in column '"
-                         + col + "': " + ",".join(allowed))
+                         + col + "': " + ", ".join(allowed))
 
 
 # ------------------------------ classes -------------------------------- #
@@ -110,6 +110,8 @@ class atlases():
     def __init__(self, atlas_tsv = None):
 
         refs = pd.read_csv(atlas_tsv, sep="\t")
+        refs = refs[refs['type'] == "reference"]
+
         required_ref_cols = ["atlas_id", "path",
                              "celltype_annot_key",
                              "ensembl_version"]
@@ -123,7 +125,7 @@ class atlases():
         
         refs.index = x
         
-        check_values(refs, "ensembl_version", [93, 98, 110])
+        check_values(refs, "ensembl_version", [87, 93, 98, 110])
         check_values(refs, "species", ["mouse", "human"])
         
         self.refs = refs.to_dict(orient="index")
