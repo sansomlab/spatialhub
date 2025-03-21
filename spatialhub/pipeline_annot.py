@@ -113,6 +113,10 @@ if len(sys.argv) > 1:
         if PARAMS["run_celltypist"]:
             if not os.path.exists("annot.dir/celltypist"):
                 os.mkdir("annot.dir/celltypist")
+        
+        if PARAMS["run_singleR"]:
+            if not os.path.exists("annot.dir/singleR"):
+                os.mkdir("annot.dir/singleR")
 
 
 # ----------------------------- Pipeline tasks ----------------------------- #
@@ -206,6 +210,7 @@ def scanviPredictAnnot(infile, outfile):
                     --atlasKey=%(input_ref)s
                     --atlasTSV=%(atlas_table)s
                     %(scviWorkers)s
+                    --findMarkersMethods=%(scanvi_findMarkers_method)s
                    &> %(log_file)s
                 ''' % dict(PARAMS, **t.var, **locals())
     

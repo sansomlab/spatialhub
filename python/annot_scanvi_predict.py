@@ -24,8 +24,8 @@ parser.add_argument("--atlasTSV", default="None", type=str,
 #                    help="type of features to subset the reference atlas to before training (one of: 'hvg', 'probes' or 'both')")
 #parser.add_argument("--probesMapping", type=str,
 #                    help="path to the mapping file matching probe names to Ensembl IDs")
-#parser.add_argument("--batchKey_hvg", type=str,
-#                    help="batch key to use when re-calculating HVGs, if applicable")
+parser.add_argument("--findMarkersMethod", type=str,
+                    help="method for scanpy.tl.rank_gene_groups to find top cluster markers")
 parser.add_argument("--scviNumWorkers", type=int,
                     help="number of workers for scVI/scANVI")
 #parser.add_argument("--scVI_pretrain", type=bool,
@@ -46,6 +46,7 @@ df = pd.read_csv(path2meta, sep = "\t")
 df_query = df[df['type'] == "query"]
 assert df_query.shape[0] == 1, "atlas data table can only list one single query (spatial) dataset"
 df_query.index = [0]
+query_key = df['atlas_id'][0]
 print("Working with the following query (spatial) dataset to annotate: ")
 print(df_query)
 
@@ -59,11 +60,6 @@ print(df)
 
 # Define path to pre-processed query dataset
 queryPath = df_query['path'][0]
-
-# Read in probes mapping file
-#path2mapping = f"{args.probesMapping}"
-#df_map = pd.read_csv(path2mapping)
-#panel_probes = set(df_map['gene_v' + df['ensembl_version'][0].astype(str)].to_list())
 
 
 # scVI settings
@@ -95,6 +91,7 @@ else:
 
 # scVI/scANVI label to use for annotation
 scvi_label = df['celltype_annot_key'][0]
+scanvi_preds_key = scvi_label + '_' + atlas_key
 
 
 # Create out directoruis
@@ -187,37 +184,52 @@ scanvi_query = scvi.model.SCANVI.load_query_data(sdata, modelDir)
 
 # Predict cell type in query dataset 
 scanvi_query.train(
-    max_epochs=100,
+    max_epochs=10,  # while piloting the pipeline!!
     plan_kwargs={"weight_decay": 0.0},
-    check_val_every_n_epoch=10
+    check_val_every_n_epoch=2
 )
 
-sdata.obs['scANVI_predict_' + atlas_key] = scanvi_query.predict(soft=True)
+sdata.obs[scanvi_preds_key] = scanvi_query.predict()
+#drop_cols = filter(lambda x: re.search(r'^_scvi_', x), col_names)
+#drop_cols = drop_cols + [scvi_label]
+#sdata.obs.drop(columns = drop_cols, inplace = True)
+sdata.obs.to_csv(os.path.join(modelDir, 
+                              query_key + '_metadata_scANVI_' + atlas_key + '.csv'))
+
+df = scanvi_query.predict(soft=True)
+print(df)
+df.to_csv(os.path.join(modelDir,
+                       query_key + '_scores_scANVI_' + atlas_key + '.csv'))
 
 
 # ---------- Task 3: Get marker genes ---------- #
 
+# Normalize sdata for marker selection
+sc.pp.normalize_total(sdata, exclude_highly_expressed=True, max_fraction=0.2)
+sdata.layers['norm'] = sdata.X.copy()
+
 # Obtain cell type-specific markers
-#sc.tl.rank_genes_groups(sdata, groupby=SCANVI_PREDICTIONS_KEY, method="t-test")
-#sc.get.rank_genes_groups_df(sdata, group=None).to_csv(SCANVI_MODEL_PATH + "/" + outFileBase + "_top-markers_t-test.csv")
-#sc.tl.rank_genes_groups(sdata, groupby=SCANVI_PREDICTIONS_KEY, method="wilcoxon")
-#sc.get.rank_genes_groups_df(sdata, group=None).to_csv(SCANVI_MODEL_PATH + "/" + outFileBase + "_top-markers_wilcox.csv")
+sc.tl.rank_genes_groups(sdata, 
+                        layer = 'norm',
+                        groupby=scanvi_preds_key, 
+                        method=args.findMarkersMethod,
+                        pts=True)
+
+# Save to CSV
+sc.get.rank_genes_groups_df(sdata, group=None).to_csv(
+    os.path.join(modelDir,
+                 query_key + '_' + atlas_key + '_top-markers.csv')
+)
 
 # Generate dot plot of top markers
-#sc.pl.rank_genes_groups_dotplot(
-#    sdata, groupby=SCANVI_PREDICTIONS_KEY, standard_scale="var", n_genes=5,
-#    save=outFileBase + ".pdf"
-#)
+sc.settings.figdir = modelDir
+sc.pl.rank_genes_groups_dotplot(
+    sdata, 
+    layer = 'norm',
+    groupby=scanvi_preds_key,
+    dendogram=True, 
+    standard_scale="var", 
+    n_genes=5,
+    save = query_key + '_' + atlas_key + '_top-markers.pdf'
+)
 
-
-# Clean up metsdata and write output
-#sdata.obs.rename(columns={SPX_MOD_BATCH: "scanvi_batch"}, inplace = True)
-
-#col_names = list(sdata.obs.columns)
-#drop_cols = filter(lambda x: re.search(r'^X_scvi_', x), col_names)
-#drop_cols = drop_cols + [SCANVI_LABELS_KEY]
-#sdata.obs.drop(columns = drop_cols, inplace = True)
-
-# Save
-#sdata.write_h5ad(SCANVI_MODEL_PATH + "/" + outFileBase + ".h5ad")
-sdata.obs.to_csv(os.path.join(modelDir, 'scANVI_predictions.csv'))

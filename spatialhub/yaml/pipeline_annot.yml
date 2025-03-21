@@ -40,6 +40,7 @@ scanvi:
   cpus: 8
   scvi_pretrain: True  # whether to pre-train an scVI model before training an scANVI one (recommended)
   feature_set: both  # whether to use hvg, probes or both
+  findMarkers_method: t-test  # t-test or wilcoxon
 
 
 

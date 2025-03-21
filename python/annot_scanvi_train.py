@@ -52,7 +52,13 @@ atlasPath = os.path.join("annot.dir/atlas.dir/", atlas_key + ".h5ad")
 # Read in probes mapping file
 path2mapping = f"{args.probesMapping}"
 df_map = pd.read_csv(path2mapping)
-panel_probes = set(df_map['gene_v' + df['ensembl_version'][0].astype(str)].to_list())
+if 'species' in df_map.columns:
+    df_map = df_map[df_map['species'] == df['species'][0]]
+
+# Extract distint gene_ids (before aggregating to probe names)
+ens_version = df['ensembl_version'][0]
+gene_key = 'gene_v' + f'{ens_version:.0f}'
+panel_genes = set(df_map[gene_key].to_list())
 
 
 # scVI settings
@@ -145,22 +151,27 @@ if args.featureSet in ['hvg', 'both']:
         
         hvg = adata.var.index[adata.var['highly_variable']].to_list()
 
-        if len(hvg) > 2 * len(panel_probes):
+        if len(hvg) > 2 * len(panel_genes):
+            
             print("Number of HVGs in provided AnnData exceeds 2x number of unique probes in panel (not recommended).",
-                  "Re-calculating with" + hvg_batch + "as batch_key.")
+                  "Re-calculating with " + hvg_batch + " as batch_key.")
+            
+            adata.var['original_hvg'] = adata.var['highly_variable']
+            
             sc.pp.highly_variable_genes(adata,
-                                        n_top_genes=min([2000, 2 * len(panel_probes)]),
+                                        n_top_genes=min([2000, 2 * len(panel_genes)]),
                                         layer='counts',
                                         batch_key=hvg_batch,
                                         flavor="seurat_v3_paper",
                                         inplace=True)
+            
             hvg = adata.var.index[adata.var['highly_variable']].to_list()
             print(len(hvg))
 
     else:
         print("No HVG found in provided AnnData. Re-calculating with " + hvg_batch + " as batch_key.")
         sc.pp.highly_variable_genes(adata,
-                                        n_top_genes=min([2000, 2 * len(panel_probes)]),
+                                        n_top_genes=min([2000, 2 * len(panel_genes)]),
                                         layer='counts',
                                         batch_key=hvg_batch,
                                         flavor="seurat_v3_paper",
@@ -172,7 +183,7 @@ else:
     hvg = []
     
 if args.featureSet in ['probes', 'both']:
-    probes = df_map['gene_v' + df['ensembl_version'][0].astype(str)].to_list()
+    probes = df_map['probe_name'].to_list()
 else:
     probes = []
 
