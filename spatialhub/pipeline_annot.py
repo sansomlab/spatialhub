@@ -189,7 +189,7 @@ def scanviTrainModel(infile, outfile):
     P.run(statement, **t.resources)
     IOTools.touch_file(outfile)
 
-
+@active_if(PARAMS['scanvi_predict'])
 @transform(scanviTrainModel,
            regex(r"(.*)/(.*)_scanviTrain.sentinel"),
            r"\1/\2_scanviPredict.sentinel")
@@ -210,10 +210,10 @@ def scanviPredictAnnot(infile, outfile):
                     --atlasKey=%(input_ref)s
                     --atlasTSV=%(atlas_table)s
                     %(scviWorkers)s
-                    --findMarkersMethods=%(scanvi_findMarkers_method)s
                    &> %(log_file)s
                 ''' % dict(PARAMS, **t.var, **locals())
-    
+                    #--findMarkersMethod=%(scanvi_findMarkers_method)s
+                    
     P.run(statement, **t.resources)
     IOTools.touch_file(outfile)
 

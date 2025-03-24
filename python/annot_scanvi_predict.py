@@ -14,22 +14,14 @@ from scipy.sparse import csr_matrix
 print("Parsing arguments")
 parser = argparse.ArgumentParser()
 
-#parser.add_argument("--path2sdata", default="None", type=str,
-#                    help="path to spatial AnnData file on which to predict labels")
 parser.add_argument("--atlasKey", default="None", type=str,
                     help="key of reference atlas to use for cell typing")
 parser.add_argument("--atlasTSV", default="None", type=str,
                     help="path to the spatialhub TSV table describing reference dataset(s) to use for cell annotation")
-#parser.add_argument("--featureSet", type=str,
-#                    help="type of features to subset the reference atlas to before training (one of: 'hvg', 'probes' or 'both')")
-#parser.add_argument("--probesMapping", type=str,
-#                    help="path to the mapping file matching probe names to Ensembl IDs")
-parser.add_argument("--findMarkersMethod", type=str,
-                    help="method for scanpy.tl.rank_gene_groups to find top cluster markers")
+#parser.add_argument("--findMarkersMethod", type=str,
+#                    help="method for scanpy.tl.rank_gene_groups to find top cluster markers")
 parser.add_argument("--scviNumWorkers", type=int,
                     help="number of workers for scVI/scANVI")
-#parser.add_argument("--scVI_pretrain", type=bool,
-#                    help="whether to first train model using scVI")
 
 args = parser.parse_args()
 
@@ -184,11 +176,12 @@ scanvi_query = scvi.model.SCANVI.load_query_data(sdata, modelDir)
 
 # Predict cell type in query dataset 
 scanvi_query.train(
-    max_epochs=10,  # while piloting the pipeline!!
+    max_epochs=100,  # while piloting the pipeline!!
     plan_kwargs={"weight_decay": 0.0},
-    check_val_every_n_epoch=2
+    check_val_every_n_epoch=10
 )
 
+print("Saving predictions")
 sdata.obs[scanvi_preds_key] = scanvi_query.predict()
 #drop_cols = filter(lambda x: re.search(r'^_scvi_', x), col_names)
 #drop_cols = drop_cols + [scvi_label]
@@ -204,32 +197,34 @@ df.to_csv(os.path.join(modelDir,
 
 # ---------- Task 3: Get marker genes ---------- #
 
+# WARNING: Memory intensive-task => outsourced!
+
 # Normalize sdata for marker selection
-sc.pp.normalize_total(sdata, exclude_highly_expressed=True, max_fraction=0.2)
-sdata.layers['norm'] = sdata.X.copy()
+#sc.pp.normalize_total(sdata, exclude_highly_expressed=True, max_fraction=0.2)
+#sdata.layers['norm'] = sdata.X.copy()
 
 # Obtain cell type-specific markers
-sc.tl.rank_genes_groups(sdata, 
-                        layer = 'norm',
-                        groupby=scanvi_preds_key, 
-                        method=args.findMarkersMethod,
-                        pts=True)
+#sc.tl.rank_genes_groups(sdata, 
+#                        layer = 'norm',
+#                        groupby=scanvi_preds_key, 
+#                        method=args.findMarkersMethod,
+#                        pts=True)
 
 # Save to CSV
-sc.get.rank_genes_groups_df(sdata, group=None).to_csv(
-    os.path.join(modelDir,
-                 query_key + '_' + atlas_key + '_top-markers.csv')
-)
+#sc.get.rank_genes_groups_df(sdata, group=None).to_csv(
+#    os.path.join(modelDir,
+#                 query_key + '_' + atlas_key + '_top-markers.csv')
+#)
 
 # Generate dot plot of top markers
-sc.settings.figdir = modelDir
-sc.pl.rank_genes_groups_dotplot(
-    sdata, 
-    layer = 'norm',
-    groupby=scanvi_preds_key,
-    dendogram=True, 
-    standard_scale="var", 
-    n_genes=5,
-    save = query_key + '_' + atlas_key + '_top-markers.pdf'
-)
+#sc.settings.figdir = modelDir
+#sc.pl.rank_genes_groups_dotplot(
+#    sdata, 
+#    layer = 'norm',
+#    groupby=scanvi_preds_key,
+#    dendogram=True, 
+#    standard_scale="var", 
+#    n_genes=5,
+#    save = query_key + '_' + atlas_key + '_top-markers.pdf'
+#)
 

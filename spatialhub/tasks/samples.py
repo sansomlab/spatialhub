@@ -109,30 +109,41 @@ class atlases():
 
     def __init__(self, atlas_tsv = None):
 
-        refs = pd.read_csv(atlas_tsv, sep="\t")
-        refs = refs[refs['type'] == "reference"]
-
-        required_ref_cols = ["atlas_id", "path",
-                             "celltype_annot_key",
-                             "ensembl_version"]
+        df = pd.read_csv(atlas_tsv, sep="\t")
         
-        check_cols(refs, required_ref_cols, "atlas.tsv")
+        required_atlas_cols = ["atlas_id", "type", "path",
+                               "celltype_annot_key",
+                               "ensembl_version"]
+        check_cols(df, required_atlas_cols, "atlas.tsv")
 
-        # Check for uniqueness of sample names per slide
-        x = refs["atlas_id"].astype(str)
+        # Check for uniqueness of atlas keys
+        x = df["atlas_id"].astype(str)
         if not x.is_unique:
             raise ValueError("Repeated atlas_ids, please make sure these are unique.")
         
-        refs.index = x
-        
-        check_values(refs, "ensembl_version", [87, 93, 98, 110])
+        df.index = x
+
+        # Subset for reference datasets
+        refs = df[df['type'] == "reference"]
+        #check_values(refs, "ensembl_version", [87, 93, 98, 110])
         check_values(refs, "species", ["mouse", "human"])
         
         self.refs = refs.to_dict(orient="index")
         self.libs = refs.to_dict()
-            
+
+        # Subset for query datasets
+        queries = df[df['type'] == "query"]
+        self.queries = queries.to_dict()
+
+
     def atlas_ids(self):
         '''
         Returns a list of atlas_ids for the project
         '''
         return(set(self.libs["atlas_id"].values()))
+    
+    def query_ids(self):
+        '''
+        Returns a list of query_ids for the project
+        '''
+        return(set(self.queries["atlas_id"].values()))
