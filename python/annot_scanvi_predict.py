@@ -109,16 +109,6 @@ if not os.path.exists(modelDir):
     os.mkdir(modelDir)
 
 
-# Set graphical options
-plot_annot = [scvi_batch] + [scvi_label] + [df['lineage_key'][0]] + [df['celltype_other_key'][0]]
-
-plot_covar = [scvi_batch] + [df['sample_key'][0]] + [df['donor_key'][0]]
-if scvi_categorical is not None:
-    plot_covar = plot_covar + scvi_categorical
-if scvi_continuous is not None:
-    plot_covar = plot_covar + scvi_continuous
-
-
 
 
 ############################## TASKS ##############################
@@ -176,7 +166,7 @@ scanvi_query = scvi.model.SCANVI.load_query_data(sdata, modelDir)
 
 # Predict cell type in query dataset 
 scanvi_query.train(
-    max_epochs=100,  # while piloting the pipeline!!
+    max_epochs=100,
     plan_kwargs={"weight_decay": 0.0},
     check_val_every_n_epoch=10
 )
@@ -227,4 +217,3 @@ df.to_csv(os.path.join(modelDir,
 #    n_genes=5,
 #    save = query_key + '_' + atlas_key + '_top-markers.pdf'
 #)
-

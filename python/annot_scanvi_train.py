@@ -110,6 +110,7 @@ if not os.path.exists(modelDir):
 
 
 # Set graphical options
+
 plot_annot = [scvi_batch] + [scvi_label] + [df['lineage_key'][0]] + [df['celltype_other_key'][0]]
 
 plot_covar = [scvi_batch] + [df['sample_key'][0]] + [df['donor_key'][0]]
@@ -117,6 +118,9 @@ if scvi_categorical is not None:
     plot_covar = plot_covar + scvi_categorical
 if scvi_continuous is not None:
     plot_covar = plot_covar + scvi_continuous
+
+plot_annot = list(filter(lambda x: x != 'none', plot_annot))
+plot_covar = list(filter(lambda x: x != 'none', plot_covar))
 
 
 
@@ -163,6 +167,7 @@ if args.featureSet in ['hvg', 'both']:
                                         layer='counts',
                                         batch_key=hvg_batch,
                                         flavor="seurat_v3_paper",
+                                        span=1,
                                         inplace=True)
             
             hvg = adata.var.index[adata.var['highly_variable']].to_list()
@@ -175,6 +180,7 @@ if args.featureSet in ['hvg', 'both']:
                                         layer='counts',
                                         batch_key=hvg_batch,
                                         flavor="seurat_v3_paper",
+                                        span=1,
                                         inplace=True)
         hvg = adata.var.index[adata.var['highly_variable']].to_list()
         print(len(hvg))

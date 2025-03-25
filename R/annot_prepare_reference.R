@@ -257,3 +257,9 @@ if ( all(rownames(counts) == rownames(rowdf)) & all(colnames(counts) == rownames
 print("Saving processed reference dataset as .h5ad file for scANVI")
 zellkonverter::writeH5AD(sce, compression = "gzip", verbose = TRUE,
                          file = paste0("annot.dir/atlas.dir/", df$atlas_id, ".h5ad"))
+
+
+# Perform HVG selection, if applicable (?) - results vary greatly from scanpy approach...
+#sce <- scuttle::logNormCounts(sce)
+#var_sce <- scran::modelGeneVar(sce, block = colData(sce)$mouse)
+#hvg_sce <- scran::getTopHVGs(var_sce, n = 2000)
