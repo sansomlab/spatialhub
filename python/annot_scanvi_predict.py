@@ -14,6 +14,8 @@ from scipy.sparse import csr_matrix
 print("Parsing arguments")
 parser = argparse.ArgumentParser()
 
+parser.add_argument("--queryKey", default="None", type=str,
+                    help="key of query dataset to annotate")
 parser.add_argument("--atlasKey", default="None", type=str,
                     help="key of reference atlas to use for cell typing")
 parser.add_argument("--atlasTSV", default="None", type=str,
@@ -30,20 +32,20 @@ args = parser.parse_args()
 
 ############################## SETUP ##############################
 
-# Read in metsdata file
+# Read in metadata file
 path2meta = f"{args.atlasTSV}"
-df = pd.read_csv(path2meta, sep = "\t")
+df0 = pd.read_csv(path2meta, sep = "\t")
 
 # Extract query dataset information
-df_query = df[df['type'] == "query"]
+df_query = df0[df0["atlas_id"] == args.queryKey]
 assert df_query.shape[0] == 1, "atlas data table can only list one single query (spatial) dataset"
 df_query.index = [0]
-query_key = df['atlas_id'][0]
+query_key = df_query['atlas_id'][0]
 print("Working with the following query (spatial) dataset to annotate: ")
 print(df_query)
 
 # Subset to atlas of interest
-df = df[df["atlas_id"] == args.atlasKey]
+df = df0[df0["atlas_id"] == args.atlasKey]
 assert df.shape[0] == 1, "atlas data frame can only have one single row"
 df.index = [0]
 atlas_key = df["atlas_id"][0]
@@ -86,7 +88,7 @@ scvi_label = df['celltype_annot_key'][0]
 scanvi_preds_key = scvi_label + '_' + atlas_key
 
 
-# Create out directoruis
+# Create out directories
 outDir = os.path.join("annot.dir/scanvi", atlas_key)
 if not os.path.exists(outDir):
     os.mkdir(outDir)
@@ -127,11 +129,21 @@ else:  # in this case, we'll assume counts are in X slot (but worth a manual che
   sdata.layers['counts'] = csr_matrix(sdata.X.copy())
 
 
+# Subset sdata.obs to the minimal variables for scvi, to avoid multiple variables with same name!!
+keepVar = [x for x in sdata.obs.columns.to_list() if x in dict_categorical.keys()]
+    # categorical dictionary includes main scVI batch_key, and thus cannot be None
+    # whereas continuous covariates are optional, therefore this dictionary may be empty
+if dict_continuous is not None:
+    keepVar = keepVar + [x for x in sdata.obs.columns.to_list() if x in dict_continuous.keys()]
+
+sdata.obs = sdata.obs[keepVar]
+
+
 # Make sure batch and categorical covariates exists, and are indeed categorical
 
 print("Matching categorical variable names between reference and query")
 sdata.obs = sdata.obs.rename(columns = dict_categorical) 
-    # dictionary includes main scVI batch_key, and thus cannot be None
+    # categorical dictionary includes main scVI batch_key, and thus cannot be None
 
 for key in dict_categorical.keys():
     # if no matching key in sdata for a covariate in sdata used to train model,
@@ -155,7 +167,7 @@ if dict_continuous is not None:
             cont_var = dict_continuous[key]
             sdata.obs[cont_var] = 0
 
-print("Working with the following spatial dataset", sdata)
+print("Predicting for following spatial dataset", sdata)
 
 
 # ---------- Task 2: Update model with query dataset and predict cell types ---------- #

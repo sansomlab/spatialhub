@@ -18,10 +18,6 @@ parser.add_argument("--atlasKey", default="None", type=str,
                     help="key of reference atlas to use for cell typing")
 parser.add_argument("--atlasTSV", default="None", type=str,
                     help="path to the spatialhub TSV table describing reference dataset(s) to use for cell annotation")
-parser.add_argument("--featureSet", type=str,
-                    help="type of features to subset the reference atlas to before training (one of: 'hvg', 'probes' or 'both')")
-parser.add_argument("--probesMapping", type=str,
-                    help="path to the mapping file matching probe names to Ensembl IDs")
 parser.add_argument("--scviNumWorkers", type=int,
                     help="number of workers for scVI/scANVI")
 parser.add_argument("--scVI_pretrain", type=bool,
@@ -47,18 +43,7 @@ print(df)
 
 # Define path to pre-processed reference dataset
 # which has already been aggregated at the probe level where several genes match the same probe
-atlasPath = os.path.join("annot.dir/atlas.dir/", atlas_key + ".h5ad")
-
-# Read in probes mapping file
-path2mapping = f"{args.probesMapping}"
-df_map = pd.read_csv(path2mapping)
-if 'species' in df_map.columns:
-    df_map = df_map[df_map['species'] == df['species'][0]]
-
-# Extract distint gene_ids (before aggregating to probe names)
-ens_version = df['ensembl_version'][0]
-gene_key = 'gene_v' + f'{ens_version:.0f}'
-panel_genes = set(df_map[gene_key].to_list())
+atlasPath = os.path.join("annot.dir/atlas.dir/", atlas_key + "_feature-subset.h5ad")
 
 
 # scVI settings
@@ -67,7 +52,6 @@ scvi.settings.dl_num_workers = args.scviNumWorkers
 
 
 # scVI/scANVI model covariates
-hvg_batch = df['hvg_batch'][0]
 scvi_batch = df['scvi_batch'][0]
 
 x = df['categorical_covar'][0]
@@ -86,7 +70,7 @@ else:
 scvi_label = df['celltype_annot_key'][0]
 
 
-# Create out directoruis
+# Create out directories
 outDir = os.path.join("annot.dir/scanvi", atlas_key)
 if not os.path.exists(outDir):
     os.mkdir(outDir)
@@ -110,7 +94,6 @@ if not os.path.exists(modelDir):
 
 
 # Set graphical options
-
 plot_annot = [scvi_batch] + [scvi_label] + [df['lineage_key'][0]] + [df['celltype_other_key'][0]]
 
 plot_covar = [scvi_batch] + [df['sample_key'][0]] + [df['donor_key'][0]]
@@ -128,78 +111,13 @@ plot_covar = list(filter(lambda x: x != 'none', plot_covar))
 ############################## TASKS ##############################
 
 
-# ---------- Task 1: Load and subset reference AnnData to HVGs and/or probes ---------- #
-
+# Load reference AnnData (subset to HVGs and/or probes)
 print("Importing atlas " + atlasPath)
 adata = sc.read_h5ad(atlasPath)
-
-if 'counts' in adata.layers.keys():
-  print("'counts' layer already stored in input reference dataset. Converting to CSR matrix.")
-  adata.layers['counts'] = csr_matrix(adata.layers['counts'])
-else:  # in this case, we'll assume counts are in X slot (but worth a manual check!)
-  print("WARNING: no 'counts' layer stored in input reference dataset. Assuming adata.X slot is set to 'counts'")
-  adata.layers['counts'] = csr_matrix(adata.X.copy())
+print("Training on the following reference dataset", adata)
 
 
-# Perform feature selection
-
-print("Defining feature subset to train model on.")
-
-if args.featureSet in ['hvg', 'both']:
-
-    # Retrieve HVGs from adata.var
-    if 'highly_variable' in adata.var.columns:
-        
-        if type(adata.var['highly_variable'][0]) == str:
-            adata.var['highly_variable'] = adata.var['highly_variable'] == 'True'
-        
-        hvg = adata.var.index[adata.var['highly_variable']].to_list()
-
-        if len(hvg) > 2 * len(panel_genes):
-            
-            print("Number of HVGs in provided AnnData exceeds 2x number of unique probes in panel (not recommended).",
-                  "Re-calculating with " + hvg_batch + " as batch_key.")
-            
-            adata.var['original_hvg'] = adata.var['highly_variable']
-            
-            sc.pp.highly_variable_genes(adata,
-                                        n_top_genes=min([2000, 2 * len(panel_genes)]),
-                                        layer='counts',
-                                        batch_key=hvg_batch,
-                                        flavor="seurat_v3_paper",
-                                        span=1,
-                                        inplace=True)
-            
-            hvg = adata.var.index[adata.var['highly_variable']].to_list()
-            print(len(hvg))
-
-    else:
-        print("No HVG found in provided AnnData. Re-calculating with " + hvg_batch + " as batch_key.")
-        sc.pp.highly_variable_genes(adata,
-                                        n_top_genes=min([2000, 2 * len(panel_genes)]),
-                                        layer='counts',
-                                        batch_key=hvg_batch,
-                                        flavor="seurat_v3_paper",
-                                        span=1,
-                                        inplace=True)
-        hvg = adata.var.index[adata.var['highly_variable']].to_list()
-        print(len(hvg))
-        
-else:
-    hvg = []
-    
-if args.featureSet in ['probes', 'both']:
-    probes = df_map['probe_name'].to_list()
-else:
-    probes = []
-
-
-features = set(hvg + probes)    
-adata = adata[:, adata.var.index.isin(features)]
-print("Working with the following subset", adata)
-
-
-# ---------- Task 2: Define scANVI model, and pre-train a scVI model if applicable ---------- #
+# ---------- Task 1: Define scANVI model, and pre-train a scVI model if applicable ---------- #
 
 # Make sure batch and categorical covariates are indeed categorical
 catVarList = [scvi_batch] + scvi_categorical
@@ -270,7 +188,7 @@ else:
     )
 
 
-# ---------- Task 3: Train scanVI model as defined above (whether from scratch or from scVI) ---------- #
+# ---------- Task 2: Train scanVI model as defined above (whether from scratch or from scVI) ---------- #
 
 # For more parameter tweaking, see also: https://discourse.scverse.org/t/scvi-tools-label-transfer-accuracy/1503
 print("Training scANVI model")
@@ -294,7 +212,7 @@ print("Finding neighbours in latent space")
 adata.obsm['X_scANVI'] = scanvi_ref.get_latent_representation()
 sc.pp.neighbors(adata, use_rep='X_scANVI')
 sc.tl.umap(adata)
-adata.write_h5ad(os.path.join(modelDir, atlas_key + '_feature-subset.h5ad'))
+adata.write_h5ad(os.path.join(modelDir, atlas_key + '_ref-adata.h5ad'))
 
 
 # Generate UMAP figures to assess training performance

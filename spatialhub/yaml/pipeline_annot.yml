@@ -20,6 +20,7 @@ mem_spx: 36
 
 simplify_metadata: False  # wheter to reduce the metadata to its minimal necessary covariates (i.e. as listed in atlas table)
 annothub_directory: /users/sansom/tme871/devel/spatialhub/data/AnnotHub_databases/  # path to set of reference Ensembl annotation TSV tables
+feature_subset: both  # whether to use hvg, probes or both to subset reference model before training
 
 
 # Probe panel specific options
@@ -39,7 +40,6 @@ scanvi:
   mem: 16
   cpus: 8
   scvi_pretrain: True  # whether to pre-train an scVI model before training an scANVI one (recommended)
-  feature_set: both  # whether to use hvg, probes or both to train reference model
   predict: True  # set to False initially to run training only
   #findMarkers_method: t-test  # t-test or wilcoxon
 

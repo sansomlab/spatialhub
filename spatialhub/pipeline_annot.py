@@ -121,6 +121,9 @@ if len(sys.argv) > 1:
 
 # ----------------------------- Pipeline tasks ----------------------------- #
 
+
+########### Atlas-level tasks ##########
+
 def ref_jobs():
 
     for atlas in A.atlas_ids():
@@ -159,9 +162,35 @@ def annotSetup(infile, outfile):
     IOTools.touch_file(outfile)
 
 
-@active_if(PARAMS['run_scanvi'])
 @transform(annotSetup,
            regex(r"(.*)/(.*)_annotSetup.sentinel"),
+           r"\1/\2_subsetReference.sentinel")
+def subsetReference(infile, outfile):
+    '''
+    Train scVI/scANVI model from provided reference
+    '''
+
+    input_ref = os.path.basename(outfile)[:-len("_subsetReference.sentinel")]
+
+    t = T.setup(infile, outfile, PARAMS,
+                memory=PARAMS['mem_atlas'],
+                cpu=1)
+    
+    statement = '''python %(spatialhub_code_dir)s/python/annot_subset_reference.py
+                    --atlasKey=%(input_ref)s
+                    --atlasTSV=%(atlas_table)s
+                    --featureSet=%(feature_subset)s
+                    --probesMapping=%(probes_mapping)s
+                   &> %(log_file)s
+                ''' % dict(PARAMS, **t.var, **locals())
+    
+    P.run(statement, **t.resources)
+    IOTools.touch_file(outfile)
+
+
+@active_if(PARAMS['run_scanvi'])
+@transform(subsetReference,
+           regex(r"(.*)/(.*)_subsetReference.sentinel"),
            r"\1/\2_scanviTrain.sentinel")
 def scanviTrainModel(infile, outfile):
     '''
@@ -179,8 +208,6 @@ def scanviTrainModel(infile, outfile):
     statement = '''python %(spatialhub_code_dir)s/python/annot_scanvi_train.py
                     --atlasKey=%(input_ref)s
                     --atlasTSV=%(atlas_table)s
-                    --featureSet=%(scanvi_feature_set)s
-                    --probesMapping=%(probes_mapping)s
                     %(scviWorkers)s
                     --scVI_pretrain=%(scanvi_scvi_pretrain)s
                    &> %(log_file)s
@@ -189,16 +216,28 @@ def scanviTrainModel(infile, outfile):
     P.run(statement, **t.resources)
     IOTools.touch_file(outfile)
 
+
+########### Atlas x Query-level tasks ##########
+
+def query_jobs():
+
+    for atlas in A.atlas_ids():
+        for query in A.query_ids():
+            sentinel_file = os.path.join("annot.dir/logs", query + "_mapping-to_" + atlas + ".sentinel")
+            yield([None, sentinel_file])
+
+
 @active_if(PARAMS['scanvi_predict'])
-@transform(scanviTrainModel,
-           regex(r"(.*)/(.*)_scanviTrain.sentinel"),
-           r"\1/\2_scanviPredict.sentinel")
+@follows(scanviTrainModel)
+@files(query_jobs)
 def scanviPredictAnnot(infile, outfile):
     '''
-    Predict cell type annotations from provided reference
+    Predict cell type annotations for a given reference-query pair
     '''
 
-    input_ref = os.path.basename(outfile)[:-len("_scanviPredict.sentinel")]
+    input_pair = os.path.basename(outfile)[:-len(".sentinel")]
+    input_ref = input_pair.split("_mapping-to_")[1]
+    input_query = input_pair.split("_mapping-to_")[0]
 
     t = T.setup(infile, outfile, PARAMS,
                 memory=PARAMS['scanvi_mem'],
@@ -208,17 +247,26 @@ def scanviPredictAnnot(infile, outfile):
     
     statement = '''python %(spatialhub_code_dir)s/python/annot_scanvi_predict.py
                     --atlasKey=%(input_ref)s
+                    --queryKey=%(input_query)s
                     --atlasTSV=%(atlas_table)s
                     %(scviWorkers)s
                    &> %(log_file)s
                 ''' % dict(PARAMS, **t.var, **locals())
-                    #--findMarkersMethod=%(scanvi_findMarkers_method)s
-                    
+    
     P.run(statement, **t.resources)
     IOTools.touch_file(outfile)
 
 
-# Add task to harmonize annotations generated from different databases
+# < Add task for other cell annotation tools >
+
+#@active_if(PARAMS['run_singleR'])
+#@files(query_jobs)
+
+#@active_if(PARAMS['run_celltypist'])
+#@files(query_jobs)
+
+
+# < Add task to harmonize annotations generated from different references/tools >
 
 
 # --------------------- < generic pipeline tasks > -------------------------- #
