@@ -180,7 +180,7 @@ scanvi_query = scvi.model.SCANVI.load_query_data(sdata, modelDir)
 scanvi_query.train(
     max_epochs=100,
     plan_kwargs={"weight_decay": 0.0},
-    check_val_every_n_epoch=10
+    check_val_every_n_epoch=20
 )
 
 print("Saving predictions")

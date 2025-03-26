@@ -153,7 +153,7 @@ if args.scVI_pretrain:
     )
     
     # Train *scVI* reference
-    scvi_ref.train(max_epochs = 50)
+    scvi_ref.train(max_epochs = 30)
     scvi_ref.save(dir_path = modelDir, overwrite = True,
                   prefix = 'scVI_')
     
@@ -161,7 +161,7 @@ if args.scVI_pretrain:
     scanvi_ref = scvi.model.SCANVI.from_scvi_model(scvi_ref,
                                                    labels_key = scvi_label,
                                                    unlabeled_category = 'unknown',
-                                                   linear_classifier=True)  # may avoid over-fitting the training dataset
+                                                   linear_classifier = False)  # Setting to True may avoid over-fitting the training dataset
     
 else:
     
@@ -170,9 +170,9 @@ else:
                                     layer="counts", 
                                     labels_key = scvi_label, 
                                     unlabeled_category = 'unknown',
-                                    batch_key=scvi_batch, 
-                                    categorical_covariate_keys=scvi_categorical,
-                                    continuous_covariate_keys=scvi_continuous)
+                                    batch_key = scvi_batch, 
+                                    categorical_covariate_keys = scvi_categorical,
+                                    continuous_covariate_keys = scvi_continuous)
     
     # Define *scANVI* model from scratch
     scanvi_ref = scvi.model.SCANVI(
@@ -184,7 +184,7 @@ else:
         n_layers=2,
         n_latent=10,
         gene_likelihood='zinb',
-        linear_classifier=True  # may avoid over-fitting the training dataset
+        linear_classifier=False  # Setting to True may avoid over-fitting the training dataset
     )
 
 
@@ -192,7 +192,7 @@ else:
 
 # For more parameter tweaking, see also: https://discourse.scverse.org/t/scvi-tools-label-transfer-accuracy/1503
 print("Training scANVI model")
-scanvi_ref.train(max_epochs=30, n_samples_per_label=100)
+scanvi_ref.train(max_epochs=50, n_samples_per_label=100)
 
 # Save model
 
