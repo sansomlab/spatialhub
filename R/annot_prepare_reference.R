@@ -65,7 +65,10 @@ print(df)
 
 # Define metadata variables to keep accordingly
 keepVar <- c(df$lineage_key, df$celltype_annot_key, df$celltype_other_key,
-             df$batch_key, df$categorical_covar, df$continuous_covar)
+             df$sample_key, df$donor_key,
+             df$hvg_batch, df$scvi_batch,
+             df$categorical_covar, df$continuous_covar)
+keepVar <- keepVar[keepVar != 'none']
 
 
 ### Read in `SingleCellExperiment` object to be processed
@@ -101,10 +104,12 @@ if (file_extension == "h5ad") {
 
 ### Clean up metadata (optional)
 
+stopifnot("Variables specified in atlas table not all found in metadata of provided atlas object" = all(keepVar %in% names(colData(sce))))
+
 coldf <- as.data.frame(colData(sce))
 
 if (opt$reduceMeta) {
-    coldf <- coldf |> dplyr::select(keepVar)
+    coldf <- coldf |> dplyr::select(all_of(keepVar))
 }
 #coldf$barcode_id <- rownames(coldf)
 
@@ -213,6 +218,8 @@ print(paste0("Reducing counts matrix from ", length(unique(rowdf$original_name))
 
 counts <- sce@assays@data$counts
 rownames(counts) <- rowdf$group
+colnames(counts) <- colnames(sce)
+print(counts[1:10, 1:15])
 
 # Split original counts matrix between genes that need to be aggregated or not
 dup_genes <- rowdf$group[duplicated(rowdf$group)]
@@ -244,12 +251,12 @@ rownames(rowdf) <- rowdf$gene
 ### Save updated H5AD
 
 # Store it all back into one updated sce object
-rowdf <- rowdf[match(rownames(counts), rownames(rowdf)), ]
+gene <- rowdf[match(rownames(counts), rownames(rowdf)), ]
 
 if ( all(rownames(counts) == rownames(rowdf)) & all(colnames(counts) == rownames(colData(sce))) ) {
   sce <- SingleCellExperiment(assays = list(counts = counts),
                               colData = colData(sce),
-                              rowData = DataFrame(rowdf))
+                              rowData = DataFrame(gene))
 } else {
     stop("Mismatch in row or column names!")
 }
