@@ -122,7 +122,7 @@ print("Training on the following reference dataset", adata)
 # Make sure batch and categorical covariates are indeed categorical
 catVarList = [scvi_batch] + scvi_categorical
 for var in catVarList:
-    adata.obs[var] = adata.obs[var].astype('category')
+    adata.obs[var] = adata.obs[var].astype(str).astype('category')
     print(adata.obs[var])
 
 # scANVI supposedly performs better when starting from model pre-trained with scVI

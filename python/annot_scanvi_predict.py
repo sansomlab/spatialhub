@@ -153,7 +153,7 @@ for key in dict_categorical.keys():
         sdata.obs[cat_var] = 'not applicable'
 
 for value in dict_categorical.values():
-    sdata.obs[value] = sdata.obs[value].astype('category')
+    sdata.obs[value] = sdata.obs[value].astype(str).astype('category')
     print(sdata.obs[value])
 
 # continuous covariates are optional, therefore this dictionary may be empty
