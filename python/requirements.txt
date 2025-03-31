@@ -38,6 +38,8 @@ torch
 scvi-tools
 celltypist
 notebook
+muspan
+networkx
 
 
 ### DRAFT requirements TBC ###
