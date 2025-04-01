@@ -69,10 +69,10 @@ adata = sc.read_h5ad(atlasPath)
 
 if 'counts' in adata.layers.keys():
   print("'counts' layer already stored in input reference dataset. Converting to CSR matrix.")
-  adata.layers['counts'] = csr_matrix(adata.layers['counts'])
+  adata.layers['counts'] = csr_matrix(adata.layers['counts'].copy(), dtype = "float32")
 else:  # in this case, we'll assume counts are in X slot (but worth a manual check!)
   print("WARNING: no 'counts' layer stored in input reference dataset. Assuming adata.X slot is set to 'counts'")
-  adata.layers['counts'] = csr_matrix(adata.X.copy())
+  adata.layers['counts'] = csr_matrix(adata.X.copy(), dtype = "float32")
 
 
 # Perform feature selection
@@ -87,7 +87,7 @@ if args.featureSet in ['hvg', 'both']:
         if type(adata.var['highly_variable'].iloc[0]) == str:
             adata.var['highly_variable'] = adata.var['highly_variable'] == 'True'
         
-        hvg = set(adata.var.index[adata.var['highly_variable']].to_list())
+        hvg = list(set(adata.var.index[adata.var['highly_variable']].to_list()))
         print("Number of HVGs in provided AnnData:", len(hvg))
 
         if len(hvg) > 2 * len(panel_genes):

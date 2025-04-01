@@ -57,6 +57,7 @@ queryPath = df_query['path'][0]
 
 
 # scVI settings
+scvi.settings.seed = 1212
 scvi.settings.dl_num_workers = args.scviNumWorkers
 #scvi.settings.num_threads = 7
 
@@ -94,9 +95,7 @@ if not os.path.exists(outDir):
     os.mkdir(outDir)
 
 # Define model name
-x = df['categorical_covar'][0]
 x = x.replace(',', '_')
-y = df['continuous_covar'][0]
 y = y.replace(',', '_')
 
 model_name = 'BATCH_' + scvi_batch 
@@ -107,6 +106,7 @@ if y != 'none':
 
 model_name = model_name + '_ANNOT_' + scvi_label
 modelDir = os.path.join(outDir, model_name)
+print('scVI output will be saved to:', modelDir)
 if not os.path.exists(modelDir):
     os.mkdir(modelDir)
 
@@ -123,10 +123,10 @@ sdata = sc.read_h5ad(queryPath)
 
 if 'counts' in sdata.layers.keys():
   print("'counts' layer already stored in input reference dataset. Converting to CSR array.")
-  sdata.layers['counts'] = csr_matrix(sdata.layers['counts'])
+  sdata.layers['counts'] = csr_matrix(sdata.layers['counts'].copy(), dtype = "float32")
 else:  # in this case, we'll assume counts are in X slot (but worth a manual check!)
   print("WARNING: no 'counts' layer stored in input reference dataset. Assuming sdata.X slot is set to 'counts'")
-  sdata.layers['counts'] = csr_matrix(sdata.X.copy())
+  sdata.layers['counts'] = csr_matrix(sdata.X.copy(), dtype = "float32")
 
 
 # Subset sdata.obs to the minimal variables for scvi, to avoid multiple variables with same name!!

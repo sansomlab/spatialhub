@@ -47,8 +47,10 @@ atlasPath = os.path.join("annot.dir/atlas.dir/", atlas_key + "_feature-subset.h5
 
 
 # scVI settings
+scvi.settings.seed = 1212
 scvi.settings.dl_num_workers = args.scviNumWorkers
 #scvi.settings.num_threads = 7
+print("Last run with scvi-tools version:", scvi.__version__)
 
 
 # scVI/scANVI model covariates
@@ -57,8 +59,10 @@ scvi_batch = df['scvi_batch'][0]
 x = df['categorical_covar'][0]
 if x != 'none':
     scvi_categorical = x.split(",")
+    catVarList = [scvi_batch] + scvi_categorical
 else:
     scvi_categorical = None
+    catVarList = [scvi_batch]
 
 y = df['continuous_covar'][0]
 if y != 'none':
@@ -76,9 +80,7 @@ if not os.path.exists(outDir):
     os.mkdir(outDir)
 
 # Define model name
-x = df['categorical_covar'][0]
 x = x.replace(',', '_')
-y = df['continuous_covar'][0]
 y = y.replace(',', '_')
 
 model_name = 'BATCH_' + scvi_batch 
@@ -89,6 +91,7 @@ if y != 'none':
 
 model_name = model_name + '_ANNOT_' + scvi_label
 modelDir = os.path.join(outDir, model_name)
+print('scVI output will be saved to:', modelDir)
 if not os.path.exists(modelDir):
     os.mkdir(modelDir)
 
@@ -120,7 +123,6 @@ print("Training on the following reference dataset", adata)
 # ---------- Task 1: Define scANVI model, and pre-train a scVI model if applicable ---------- #
 
 # Make sure batch and categorical covariates are indeed categorical
-catVarList = [scvi_batch] + scvi_categorical
 for var in catVarList:
     adata.obs[var] = adata.obs[var].astype(str).astype('category')
     print(adata.obs[var])
