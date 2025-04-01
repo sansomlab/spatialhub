@@ -178,9 +178,9 @@ scanvi_query = scvi.model.SCANVI.load_query_data(sdata, modelDir)
 
 # Predict cell type in query dataset 
 scanvi_query.train(
-    max_epochs=10,
+    max_epochs=100,
     plan_kwargs={"weight_decay": 0.0},
-    check_val_every_n_epoch=2
+    check_val_every_n_epoch=10
 )
 
 print("Saving predictions")
