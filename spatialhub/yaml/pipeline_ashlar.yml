@@ -44,3 +44,22 @@ ashlar:
     med_mem: 4
     high_mem: 8
 
+
+# Create .zarr SpatialData object from Ashlar output
+# ---------------
+
+create_zarr: True
+
+# allocated memory
+sdata_mem: 16
+
+channels_dict: PanCK,CD68,Membrane,CD45,DNA  # list of image channels in correct order
+remove_probes: Bacteria,Helicobact  # list of non-standard probes, e.g. from a different species, to be excluded from main transcripts matrix (Negative|SystemControl probes are stored apart by default)
+
+# names of essential variables in input transcripts file
+probe_key: target
+x_coord: x_global_px
+y_coord: y_global_px
+
+# whether to include original AtoMx segmentation mask
+import_atomx_mask: True

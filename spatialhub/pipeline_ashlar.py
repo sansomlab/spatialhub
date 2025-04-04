@@ -255,9 +255,45 @@ def ashlarConvertCoords(infile, outfile):
     IOTools.touch_file(outfile)
 
 
+@active_if(PARAMS['create_zarr'])
+@transform(ashlarConvertCoords,
+           regex(r"(.*)/(.*)_ashlarConvertCoords.sentinel"),
+           r"\1/\2_ashlarCreateZarr.sentinel")
+def ashlarCreateZarr(infile, outfile):
+    '''
+    Create a zarr (spatial data) object to facilitate visualization of Ashlar output
+    '''
+
+    if not os.path.exists("zarr.dir"):
+        os.mkdir("zarr.dir")
+
+    t = T.setup(infile, outfile, PARAMS,
+                memory=PARAMS["sdata_mem"],
+                cpu=1)
+    
+    input_sample = os.path.basename(infile)[:-len("_ashlarConvertCoords.sentinel")]
+    
+    statement = '''python %(spatialhub_code_dir)s/python/ashlar_zarr.py
+                   --projDir=%(projDir)s
+                   --sampleKey=%(input_sample)s
+                   --fov2sample=%(sample_table)s
+                   --channels=%(channels_dict)s
+                   --rmProbes=%(remove_probes)s
+                   --probeKey=%(probe_key)s
+                   --x=%(x_coord)s
+                   --y=%(y_coord)s
+                   --importAtomxMask=%(import_atomx_mask)s
+                   &> %(log_file)s
+                ''' % dict(PARAMS, **t.var, **locals())
+    
+    P.run(statement, **t.resources)
+    IOTools.touch_file(outfile)
+
+
+
 # --------------------- < generic pipeline tasks > -------------------------- #
 
-@follows(ashlarConvertCoords)
+@follows(ashlarCreateZarr)
 def full():
     pass
 
