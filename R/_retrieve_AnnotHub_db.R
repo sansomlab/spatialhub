@@ -43,4 +43,4 @@ names(ahub) <- c("ensembl_id", "gene", "entrez_id", "gene_biotype", "gene_descri
 
 #data/AnnotHub_databases
 write.table(ahub, row.names = FALSE, quote = FALSE, sep = "\t",
-            file = 'reference-data/hs_EnsDb_v110.tsv')
+            file = 'data/AnnotHub_databases/hs_EnsDb_v110.tsv')

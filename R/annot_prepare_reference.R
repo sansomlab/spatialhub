@@ -13,7 +13,8 @@ stopifnot(
   require(tidyverse),
   require(data.table),
   require(zellkonverter),
-  require(SingleCellExperiment)
+  require(SingleCellExperiment),
+  require(Matrix)
 )
 
 
@@ -99,6 +100,11 @@ if (file_extension == "h5ad") {
   stop("Please provide a `.h5ad` or `.rds` file as input.")
 }
 
+print("Working with the following `SingleCellExperiment` object:")
+print(sce)
+
+
+
 
 # ---------- Tasks ----------
 
@@ -173,7 +179,11 @@ rowdf$updated_name <- rowdf$gene
 
 n_mismatch <- sum(is.na(rowdf$updated_name))
 print(paste0("Number of genes IDs that remain unmapped: ", n_mismatch))
+print(rowdf$original_name[is.na(rowdf$updated_name)])
+
+# Keep original name when no match was found
 rowdf$updated_name[is.na(rowdf$updated_name)] <- rowdf$original_name[is.na(rowdf$updated_name)]
+rowdf$gene[is.na(rowdf$gene)] <- rowdf$original_name[is.na(rowdf$gene)]
 
 
 # Retrieve HVG information if known
@@ -193,6 +203,7 @@ if ("highly_variable" %in% names(rowData)) {
 ### Retrieve CosMx probe mapping to specified Ensembl database
 
 cosmx_df <- read.csv(opt$path2mapping)
+cosmx_df <- cosmx_df[!duplicated(cosmx_df), ]
 n_probes <- length(unique(cosmx_df$probe_name))
 
 mapping_key <- paste0("gene_v", df$ensembl_version)
@@ -210,16 +221,33 @@ print(paste0("Genes in this reference dataset cover ", n_covered,
 rowdf$group <- rowdf$updated_name
 rowdf$group[!is.na(rowdf$probe_name)] <- rowdf$probe_name[!is.na(rowdf$probe_name)]
 
+# Remove potential duplicates due to 1:many mappings in gene:ensembl_id, keeping only the first ensembl_id
+rowdf <- rowdf |> dplyr::arrange(ensembl_id) |>
+  dplyr::select(original_name, updated_name, gene, 
+                ensembl_id, entrez_id, gene_biotype,
+                probe_name, group)
+rowdf <- rowdf[!duplicated(rowdf$original_name), ]
+
 
 ### Aggregate counts for gene_ids corresponding to the same probe name
 
 print(paste0("Reducing counts matrix from ", length(unique(rowdf$original_name)), 
              " to ", length(unique(rowdf$group)), " distinct gene_ids"))
 
-counts <- sce@assays@data$counts
+if ("counts" %in% names(sce@assays@data)) {
+  counts <- sce@assays@data$counts
+} else if ("X" %in% names(sce@assays@data)) {
+  print("No counts layer found in provided reference atlas. Using 'X' slot instead")
+  counts <- sce@assays@data$X
+} else {
+  stop("No counts layer found in provided reference atlas.")
+}
+v <- rowSums(counts)
+stopifnot("Reference dataset contains normalized values. Please provide raw counts." = all(v - floor(v) == 0))
+
 rownames(counts) <- rowdf$group
 colnames(counts) <- colnames(sce)
-print(counts[1:10, 1:15])
+print(counts[1:10, 1:10])
 
 # Split original counts matrix between genes that need to be aggregated or not
 dup_genes <- rowdf$group[duplicated(rowdf$group)]

@@ -155,7 +155,8 @@ if args.scVI_pretrain:
     )
     
     # Train *scVI* reference
-    scvi_ref.train(max_epochs = 30)
+    scvi_ref.train() #max_epochs = 30
+    print(scvi.ref)
     scvi_ref.save(dir_path = modelDir, overwrite = True,
                   prefix = 'scVI_')
     
@@ -194,7 +195,8 @@ else:
 
 # For more parameter tweaking, see also: https://discourse.scverse.org/t/scvi-tools-label-transfer-accuracy/1503
 print("Training scANVI model")
-scanvi_ref.train(max_epochs=50, n_samples_per_label=100)
+scanvi_ref.train(max_epochs=20, n_samples_per_label=100)
+print(scanvi_ref)
 
 # Save model
 
