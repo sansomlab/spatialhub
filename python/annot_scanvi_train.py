@@ -156,7 +156,7 @@ if args.scVI_pretrain:
     
     # Train *scVI* reference
     scvi_ref.train() #max_epochs = 30
-    print(scvi.ref)
+    print(scvi_ref)
     scvi_ref.save(dir_path = modelDir, overwrite = True,
                   prefix = 'scVI_')
     
