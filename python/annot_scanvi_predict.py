@@ -188,6 +188,7 @@ sdata.obs[scanvi_preds_key] = scanvi_query.predict()
 #drop_cols = filter(lambda x: re.search(r'^_scvi_', x), col_names)
 #drop_cols = drop_cols + [scvi_label]
 #sdata.obs.drop(columns = drop_cols, inplace = True)
+print(sdata.obs)
 sdata.obs.to_csv(os.path.join(modelDir, 
                               query_key + '_metadata_scANVI_' + atlas_key + '.csv'))
 
