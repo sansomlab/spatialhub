@@ -132,7 +132,7 @@ tx = tx[~idx0].copy()  # updating tx to exclude negative/control probes
 if rm_probes_regex != 'none':
     
     idx_other = tx[args.probeKey].str.contains(rm_probes_regex)
-    tx_other = tx_other[idx_other].copy()
+    tx_other = tx[idx_other].copy()
     tx_other = models.PointsModel.parse(tx_other, feature_key = args.probeKey,
                                         coordinates = {'x': args.x, 'y': args.y})
     
