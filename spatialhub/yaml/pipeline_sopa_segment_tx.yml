@@ -1,0 +1,26 @@
+#
+# Pipeline pipeline_sopa_segment_tx.py configuration file
+# ==================================================
+#
+
+# General options
+# ---------------
+
+# Location of the samples.tsv table
+# (see documentation for details)
+sample_table: /users/sansom/tme871/work/kir032_morrell_cosmx_cancer/shared/cosmx/metadata/HNSCC_spatialhub_samples.tsv
+
+
+# Baysor (using SOPA) segmentation options
+# ---------------
+
+run_baysor: True
+bs:
+  mem: 4
+  cpu: 8
+  patch_width: 6000  # patch width should be ~10x cell diameter (in pixels?)
+  patch_ovlp: 150  # patch overlap should be ~2x cell diameter (in pixels?)
+  prior_mask: atomx  # mask to use as a prior
+  toml: sopa_baysor_config.toml
+  cell_area: 2000  # minimal area of a polygon for it to be considered as a cell
+  mask_key: 'baysor_atomx'

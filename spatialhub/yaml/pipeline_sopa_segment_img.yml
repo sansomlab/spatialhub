@@ -1,5 +1,5 @@
 #
-# Pipeline pipeline_segment.py configuration file
+# Pipeline pipeline_sopa_segment_img.py configuration file
 # ==================================================
 #
 
@@ -9,25 +9,6 @@
 # Location of the samples.tsv table
 # (see documentation for details)
 sample_table: /users/sansom/tme871/work/kir032_morrell_cosmx_cancer/shared/cosmx/metadata/HNSCC_spatialhub_samples.tsv
-
-
-# 'Master' SpatialData options
-# ---------------
-
-# allocated memory
-sdata_mem: 16
-
-# path to stitched data directory (dafault to ashlar out directory)
-# => shoul include one sub-directory per slide, each containing all sample files for that slide
-stitched_dir: ./ashlar.dir/
-
-channels_dict: PanCK,CD68,Membrane,CD45,DNA  # list of image channels in correct order
-remove_probes: Neg,Sys,Bac  # list of non-standard probes, to be excluded from transcripts-based segmentation (e.g. Negative, System, bacterial probes...)
-
-# names of essential variables in input transcripts file
-probe_key: target
-x_coord: x_global_px
-y_coord: y_global_px
 
 
 # Cellpose (using SOPA) segmentation options
