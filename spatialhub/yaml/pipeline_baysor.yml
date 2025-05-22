@@ -1,0 +1,29 @@
+#
+# Pipeline pipeline_segment.py configuration file
+# ==================================================
+#
+
+# General options
+# ---------------
+
+# Location of the samples.tsv table
+# (see documentation for details)
+sample_table: /users/sansom/tme871/work/kir032_morrell_cosmx_cancer/shared/cosmx/metadata/HNSCC_spatialhub_samples.tsv
+
+# Set this to False if you wish to perform the transcripts file pre-processing manually
+# => make sure the 'prior' variable in this transcripts table is named 'prior'
+#    and uses '0' for unassigned transcript
+#preprocessing: True
+remove_probes: none  # list of non-standard probes, e.g. from a different species, to be excluded from main transcripts matrix for segmentation (Negative|SystemControl probes are excluded by default); use none to ignore this parameter
+
+
+# Baysor segmentation options
+# ---------------
+
+mem: 4
+cpu: 8
+toml_file: baysor_config.toml
+
+# Post-processing filtering thresholds
+min_area: 500  # minimal area (in square pixels) of a polygon for it to be considered as a cell
+min_nCount: 20
