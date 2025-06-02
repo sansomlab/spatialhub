@@ -10,7 +10,7 @@
 matrix_file: /users/sansom/tme871/work/cosmx_mouse/spatialhub/anndata.dir/mouse_ibd_hh_atomx.h5ad 
 
 # Location of the samples.tsv table
-# (see documentation for deta
+# (see documentation for details)
 sample_table: /users/sansom/tme871/work/cosmx_mouse/metadata/mouse_ibd_hh_spatialhub_samples.tsv 
 
 # Allocated memory (requirements depend on size of input matrix)
@@ -25,7 +25,7 @@ probes:
     background: Negative  # Default negative control probe name for CosMx
     poscontrol: System    # Default positive control probe name for CosMx
 
-# Path to a .csv table describing custom probes, if applicable
+# Whether a custom probe panel was used, and path to a .csv table describing it, if applicable
 custom_panel: False
 custom_probes_table: /users/sansom/tme871/work/cosmx_mouse/metadata/1K_Oxford_Sansom_1-clean.csv
 
@@ -40,6 +40,7 @@ FOV:
     
 bruker:
     runQC: False  # Whether to run FOV QC tool from Bruker to detect instrument failures with CosMx (requires FOV_runQC to be True)
+    # Path to Bruker code and barcodes_panel files, retrieved from their GitHub: https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/FOV%20QC
     code: /gpfs3/well/sansom/users/tme871/devel/spatialhub/R/bruker_FOV_QC_utils.R
     data: /gpfs3/well/sansom/users/tme871/devel/spatialhub/data/bruker_barcodes_panel.RDS
 
@@ -59,8 +60,7 @@ filtering:
     sample_min_cells_passQC: 2500
     sample_min_percent_passQC: 50
     sample_remove_failed_FOVs: False  
-        # when tallying cells to finalize sample-level QC
-        # whether to consider *cell* filters only or *cell* and *FOV* both
+        # when tallying cells to finalize sample-level QC whether to consider *cell* filters only or *cell* and *FOV* both
     
 
 
