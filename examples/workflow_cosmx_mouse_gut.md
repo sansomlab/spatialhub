@@ -1,26 +1,30 @@
-# `spatialhub` example workflow: CosMx mouse gut
+# CosMx mouse gut analysis workflow - Part 1
 
-The following markdown documents steps followed to perform the analysis of a CosMx study of the mouse gut in the IBD model.
+The following markdown provides a step-by-step workflow to reproduce the analysis of a CosMx study of the mouse gut in an IBD model, **from retrieving the raw data to generating one 'master' `SpatialData` object containing a stitched image and transcripts table per sample on the original microscopy slide**. (See Part 2 for the next steps of the analysis.)
 
 * * *
 
-## Experimental design
+## Study overview
 
 The experiment covers . . .
 
-* * *
+### Data storage on BMRC
 
-## Data storage
-
-Raw and processsed data alongside key scripts to reproduce the analysis on the BRMC cluster in this directory: `/users/sansom/tme871/work/cosmx_mouse`
+Raw and processsed data alongside key scripts to reproduce the analysis on the BMRC cluster in this directory: `/users/sansom/tme871/work/cosmx_mouse`
 
 Here is an overview of where to find key files:
 
 - Original raw data, as exported from `AtoMx SIP` through their user interface: `/users/sansom/tme871/work/cosmx_mouse/data/raw/atomx`
-    - _NOTE:_ At this stage of the analysis (June 2025), where we are confidently moving away from `AtoMx` default analyses tools, these data files could be deleted (knowing they can always be downloaded again from our `AtoMx SIP`). I have kept them as an example of an `AtoMx` export, but the minimal relevant files are copied in the directories described in the bullet point below.
+
+> [!NOTE]
+> At this stage of the analysis (June 2025), we are confidently moving away from `AtoMx` default analyses tools, so these data files could be deleted (knowing they can always be downloaded again from our `AtoMx SIP`). I have kept them as an example of an `AtoMx` export, but the minimal relevant files are copied in the directories described in the bullet point below.
+
 - **Raw data, re-organized for analysis with `spatialhub`**: `/users/sansom/tme871/work/cosmx_mouse/data/raw/${SLIDE_ID}`, with the following slide IDs available: NL4S3a, NL4S3b, NL5H1a, NL5H1b ('a' indicates a KIR run, 'b' indicates a CAMS run - see experimental design section above)
 - **Metadata**, including `spatialhub` samples.tsv table (full and filtered for samples passing QC, see details below) and lists of CosMx probes (standard 'LBL-11176-05-Mouse-Universal-Cell-Characterization-Gene-List.txt' and custom add-on panel '1K_Oxford_Sansom_add-on_list.csv')
-    - **_WARNING:_ In this study, some of the custom probes use special characters (e.g. *SiglecF (170)* instead of *Siglecf*) and/or non-conventional gene symbols (e.g. *Ly6G* instead of *Ly6g*; *Cd64* instead of *Fcgr1*). In addition, some probes in the standard panel are cross-reactive and match multiple genes. Whenever comparing a CosMx probe panel to other datasets/pathway libraries/etc., it is essential to ensure gene names are properly encoded for the intended purpose.** This point is highlighted again where most relevant in the workflow description.
+
+> [!WARNING]
+> **In this study, some of the custom probes use special characters (e.g. *SiglecF (170)* instead of *Siglecf*) and/or non-conventional gene symbols (e.g. *Ly6G* instead of *Ly6g*; *Cd64* instead of *Fcgr1*). In addition, some probes in the standard panel are cross-reactive and match multiple genes. Whenever comparing a CosMx probe panel to reference scRNA-seq datasets/pathway libraries/etc., it is essential to ensure that gene names are properly encoded for the intended purpose.** This point is highlighted again where most relevant in the workflow description.
+
 - **atlas** and **reference-data**: < add descriptive blurb >
 - **spatialhub**: Main analysis folder, containing YAML, log out output files/directories from steps run with the `spatialhub` pipeline, as well as additional scripts for steps requiring more customization.
 - Other directories contain pilot scripts (irrelevant to reproduce the final analysis), used to test different spatial transcriptomics tools before rolling them out to the dataset as a whole and/or adding them to the `spatialhub` suite of pipelines, if applicable
@@ -28,9 +32,7 @@ Here is an overview of where to find key files:
 * * *
 
 
-## Analysis workflow (1): Setup
-
-### Step 1: Retrieve raw data from `AtoMx`
+## Step 1: Retrieve raw data from `AtoMx`
 
 Once a `CosMx` run is complete, a new microscopy slide will appear on the `AtoMx SIP` user interface. You'll first need to create a study for the slide(s) of interest. 
 
@@ -52,12 +54,15 @@ This pop-up window also states the SFTP information to use to access the data on
 sftp -P 22 username@kennedy.ox.ac.uk@eu.export.atomx.nanostring.eu
 ```
 
-**_NOTE:_ Please refer to the latest [NanoString University documentation](https://university.nanostring.com/) for further details on how to use the `CosMx` suite of software, and especially [this manual](https://university.nanostring.com/cosmx-smi-data-analysis-user-manual).**
+> [!NOTE]
+> **Please refer to the latest [NanoString University documentation](https://university.nanostring.com/) for further details on how to use the `CosMx` suite of software, and especially [this manual](https://university.nanostring.com/cosmx-smi-data-analysis-user-manual).**
+
+* * *
 
 
-### Step 2: Re-organize raw data for analysis with `spatialhub`
+## Step 2: Re-organize raw data for analysis with `spatialhub`
 
-The raw data export from `AtoMx` includes multiple superfluous files, and a nested directory structure that can make relevant information difficult to find. To streamline analysis with `spatialhub`, we thus first re-organize our raw data directory such that there is **one sub-directory per microscopy slide** run on the CosMx machine (regardless of other potential batch effects, e.g. different runs with multiple slides each). **Each slide-specific directory must have the same name as listed in the 'slide_id' column of the `spatialhub` samples.tsv file** (see below for details on how to specify this file).
+The raw data export from `AtoMx` includes multiple superfluous files, and a nested directory structure that can make relevant information difficult to find. To streamline analysis with `spatialhub`, we thus first (manually) re-organize our raw data directory such that there is **one sub-directory per microscopy slide** run on the CosMx machine (regardless of other potential batch effects, e.g. different runs with multiple slides each). **Each slide-specific directory must have the same name as listed in the 'slide_id' column of the `spatialhub` samples.tsv file** (see below for details on how to specify this file).
 
 In each slide's directory, copy the following sub-directories and files, using the following name conventions:
 
@@ -68,6 +73,8 @@ In each slide's directory, copy the following sub-directories and files, using t
     - 'Morphology_ChannelID_Dictionary.txt': necessary to match each microscopy channel to its corresponding marker (useful to specify in ashlar YAML file)
     - 'Run_*RunSpecificKey*_ExptConfig.txt': necessary to know the pixel to micron conversion factor
     - both of these files are found under `RawFiles/*/RunSummary` in the original `AtoMx` export
+
+* * *
 
 
 ### Step 3: Create a `spatialhub` samples.tsv file
@@ -95,12 +102,10 @@ The following fields are optional, and have the following purpose:
 * * *
 
 
-## Analysis workflow (2): Spatial data clean-up
+## Step 4: Run initial QC
 
-**From here onwards, it is recommended to run all steps within a dedicated `spatialhub` directory.**
-
-
-### Step 4: Run initial QC 
+> [!TIP]
+> **From here onwards, it is recommended to run all steps within a dedicated `spatialhub` directory.**
 
 This first round of QC relies on the default `AtoMx` segmentation mask. Of note, even if not planning to use this segmentation mask for downstream analyses, it is useful to run a first pass of QC at this point, to enable:
 
@@ -108,7 +113,7 @@ This first round of QC relies on the default `AtoMx` segmentation mask. Of note,
 - Identification of low-quality samples, which should be filtered out before proceeding with other resource-intensive tasks of the pipeline
 
 
-#### 4.1. Preparing an AnnData object
+### 4.1. Preparing an AnnData object
 
 To run this probe QC pipeline, first create a combined AnnData object from raw `AtoMx` files, using the function provided in `spatialhub` adata_utils within a python session:
 
@@ -140,7 +145,7 @@ adata_combined.write('mouse_ibd_hh_atomx.h5ad', compression = 'gzip')
 ```
 
 
-#### 4.2. Preparing the YAML file
+### 4.2. Preparing the YAML file
 
 Next, generate a YAML file for the `spatialhub` probeqc pipeline using the following on the command line:
 
@@ -153,11 +158,12 @@ This generates a probe QC YAML file, which notably points the pipeline to the sa
 If a custom panel was used (as is the case in this example), the user can specify which probes are custom (others will be treated as standard by default), and the number of transcripts associated to these will be computed (in contrast to the number of transcripts from standard probes).
 
 
-##### Notes on FOV QC
+#### Notes on FOV QC
 
 The FOV-level QC section of the YAML file specifies whether to run Bruker's tool to check for instrument failures. [See their GitHub for details and to source their code](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/FOV%20QC). A copy of the exact version of the script used in this project is available on the BMRC cluster at `/users/sansom/tme871/devel/spatialhub/R/bruker_FOV_QC_utils.R`
 
-_NOTE:_ When running Bruker's FOV QC tool, you may find that some of the default parameters implemented in their script need to be tweaked. This is currently not implemented in the `spatialhub` probeqc pipeline, which needs you'll need to manually amend the script sourced from Bruker's GitHub. Notably, the `squares_per_fov` and `min_cells_per_square` parameters in the `makeGrid` function may need adjusting for low-sensitivity CosMx dataset:
+> [!TIP]
+> When running Bruker's FOV QC tool, you may find that some of the default parameters implemented in their script need to be tweaked. This is currently not implemented in the `spatialhub` probeqc pipeline, which means you'll need to manually amend the script sourced from Bruker's GitHub. Notably, the `squares_per_fov` and `min_cells_per_square` parameters in the `makeGrid` function may need adjusting for low-sensitivity CosMx dataset, as illustrated in the code chunk below.
 
 ```
 # lines 32-34 - /users/sansom/tme871/devel/spatialhub/R/bruker_FOV_QC_utils.R
@@ -166,12 +172,17 @@ _NOTE:_ When running Bruker's FOV QC tool, you may find that some of the default
                        min_cells_per_square = 10) 
 ```
 
-##### Notes on filtering parameters
+#### Notes on filtering parameters
 
-The filtering section of the YAML file provides options to define QC thresholds at the cell-level and sample-level. Sample-level filters are particularly useful for studies with microscopy slides including many samples, each of which is only covered by a handful of FOVs (in this scenario, one or two poor-quality FOVs may mean that >50% of the sample is of low-quality, and it may be preferable to remove this sample altogther). The user can notably set a minimum number/percent of high-quality cells remaining in the sample for it to be retained (too few cells usually means a sparse sample and biased spatial metrics in downstream analyses), as well as whether cells within low-quality FOVs should all be considered as low-quality or not when tallying the number of high-quality cells in a sample (we recommend to set this to False, as cells/FOVs with bias are usually identified independently in downstream analyses). **Of note, the data will NOT be filtered by the probe QC pipeline: these thresholds are only meant to flag high-quality cells/samples, with the final filtering left to the user, as this is highly study-specific.**
+The filtering section of the YAML file provides options to define QC thresholds at the cell-level and sample-level. 
+
+Sample-level filters are particularly useful for studies with microscopy slides including many samples, each of which is only covered by a few FOVs (in such a scenario, one or two poor-quality FOVs may mean that >50% of the sample is of low-quality, and it may be preferable to remove this sample altogther). The user can notably set a minimum number/percent of high-quality cells remaining in the sample for it to be retained (too few cells usually means a sparse sample and biased spatial metrics in downstream analyses), as well as whether cells within low-quality FOVs should all be considered as low-quality or not when tallying the number of high-quality cells in a sample (we recommend to set this to False, as cells/FOVs with bias are usually identified independently in downstream analyses). 
+
+> [!IMPORTANT]
+> **The data will NOT be filtered by the probe QC pipeline: thresholds specified in the YAML file are only meant to flag high-quality cells/samples, with the final filtering left to the user, as it will be highly study-specific.**
 
 
-#### 4.3. Running the pipeline tasks and reviewing results
+### 4.3. Running the pipeline tasks and reviewing results
 
 Next, run the pipeline using:
 
@@ -184,7 +195,7 @@ A `probeqc.dir` directory will be generated in your run directory, including som
 If wishing to adjust the filtering thresholds, delete the sentinel files and repeat this pipeline run. 
 
 
-#### 4.4. Filtering dataset for low-quality samples/cells
+### 4.4. Filtering dataset for low-quality samples/cells
 
 Once satisfied with your QC filters, perform a manual filtering (with potential additional filters) of the `spatialhub` samples.tsv table, e.g. by running this script (`/users/sansom/tme871/work/cosmx_mouse/spatialhub/filter_metadata.R`):
 
@@ -278,7 +289,7 @@ if metadata.index.equals(adata.obs.index):
 # Import samples TSV table filtered for low-quality samples
 samples = pd.read_csv("../metadata/mouse_ibd_hh_spatialhub_samples_filtered.tsv", sep = "\t")
 
-# Finally, filter AnnData object to retain only high-qaulity cells and samples
+# Finally, filter AnnData object to retain only high-quality cells and samples
 samples_filter = adata.obs['sample_id'].isin(samples['sample_id'])
 adata = adata[samples_filter]
 cells_filter = adata.obs['qcFlagCell_summary'] == 'Pass'
@@ -302,8 +313,10 @@ adata.var = adata.var.join(probes_annot)
 adata.write_h5ad("anndata.dir/mouse_ibd_hh_atomx_filtered.h5ad")
 ```
 
+* * *
 
-### Step 5: Stitch samples using Ashlar
+
+## Step 5: Stitch samples using Ashlar
 
 The Ashlar pipeline can now be used to generate one stitched image and `SpatialData` object per sample. The purpose of this pipeline is three-fold:
 
@@ -317,7 +330,7 @@ The Ashlar pipeline can now be used to generate one stitched image and `SpatialD
 3. Generate an initial `SpatialData` object (stored as a `.zarr` directory) for each sample, which will be essential for many downstream data visualization and analyses tasks. [Please review the `SpatialData` documentation for further details on this file format.](https://spatialdata.scverse.org/en/stable/)
 
 
-#### 5.1. Preparing the YAML file
+### 5.1. Preparing the YAML file
 
 First, generate a YAML file for the `spatialhub` ashlar pipeline using the following on the command line:
 
@@ -334,7 +347,7 @@ Parameters in this YAML file should apply to most CosMx runs (as of June 2025); 
 - the names of the columns storing information about i) the probe name (the current default is `target` in the AtoMx transcripts '_tx_file.csv.gz' file) and ii) x/y coordinates
 
 
-#### 5.2. Running the pipeline tasks 
+### 5.2. Running the pipeline tasks 
 
 Once the YAML file is ready, the pipeline can be run with:
 
@@ -342,12 +355,14 @@ Once the YAML file is ready, the pipeline can be run with:
 spatialhub ashlar make full -v5 -p20
 ```
 
-_NOTE:_ The first task in the `ashlar` pipeline involves creating a split copy of the `AtoMx` raw expression matrix and transcripts file. The purpose of this is to limit the memory needed to load the data in downstream tasks, thus leading to significant speed improvements. This task is run using a [bash script](../bash/cosmx_setup.sh), and adds a `split_exprMat` and `split_txFile` to the raw data folder. **This task will generate an incorrect output if these directories pre-exist and are not empty. Once it has been run, make sure not to remove the corresponding sentinel file(s) (`ashlar.dir/logs/[slide_id]_splitFlatFiles.sentinel`). If you wish to repeat this task, manually delete the `split_exprMat` and `split_txFile` first.**
+> [!CAUTION]
+> The first task in the `ashlar` pipeline involves creating a split copy of the `AtoMx` raw expression matrix and transcripts file. The purpose of this is to limit the memory needed to load the data in downstream tasks, thus leading to significant speed improvements. This task is run using a [bash script](../bash/cosmx_setup.sh), and adds a `split_exprMat` and `split_txFile` to the raw data folder. **This task will generate an incorrect output if these directories pre-exist and are not empty. Once it has been run, make sure not to remove the corresponding sentinel file(s) (`ashlar.dir/logs/[slide_id]_splitFlatFiles.sentinel`). If you wish to repeat this task, manually delete the `split_exprMat` and `split_txFile` first.**
 
-_DEBUGGING:_ For this specific project, adding the `AtoMx` segmentation mask to the `.zarr` stack triggered an error for a few of the samples. After running the command line above to generate `SpatialData` objects for most samples, we thus repeated the run with the pipeline temporarily pointing to [this version](../python/ashlar_zarr_debug.py) of the `.zarr` generation file, which filters out cells with missing coordinates from the `AtoMx` segmentation mask. **Only use this debugging script for samples that failed in first instance, otherwise it will remove valid cell masks from other segmentation masks.** In a future version of `spatialhub`, we aim to investigate this bug further and provide a more robust fix.
+> [!WARNING]
+> For this specific project, adding the `AtoMx` segmentation mask to the `.zarr` stack triggered an error for a few of the samples. After running the command line above to generate `SpatialData` objects for most samples, we thus repeated the run with the pipeline temporarily pointing to [this version](../python/ashlar_zarr_debug.py) of the `.zarr` generation file, which filters out cells with missing coordinates from the `AtoMx` segmentation mask. **Only use this debugging script for samples that failed in first instance, otherwise it will remove valid cell masks from other segmentation masks.** In a future version of `spatialhub`, we aim to investigate this bug further and provide a more robust fix.
 
 
-#### 5.3. Reviewing outputs
+### 5.3. Reviewing outputs
 
 Major outputs from this pipeline are stored in two new directories, which will be generated in your run directory: `ashlar.dir` and `zarr.dir` (if `create_zarr` was set to `True` in the YAML file).
 
