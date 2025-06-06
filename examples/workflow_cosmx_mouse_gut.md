@@ -6,7 +6,7 @@ The following markdown documents steps followed to perform the analysis of a Cos
 
 ## Experimental design
 
-The experiment covers 
+The experiment covers . . .
 
 * * *
 
@@ -36,11 +36,15 @@ Once a `CosMx` run is complete, a new microscopy slide will appear on the `AtoMx
 
 Once a study has been created, open it and click on 'EXPORT' (top left area of the screen, under the 'Study details' section) to retrieve the data:
 
-![AtoMx EXPORT button](./images/atomx_export_button.png)
+<p align="center">
+    <img src="./images/atomx_export_button.png" width="300">
+</p>
 
 Select all of the following files in the pop-up window that opens:
 
-![AtoMx files for export](./images/atomx_export_files.png)
+<p align="center">
+    <img src="./images/atomx_export_files.png" width="600">
+</p>
 
 This pop-up window also states the SFTP information to use to access the data once the export is complete. For Kennedy users, you can use the following command and navigate to the directory of interest to copy the data to the BMRC:
 
@@ -78,7 +82,9 @@ The following fields are mandatory (the order they appear in does not matter):
 - **fov_width**: number of FOVs spanning the image width (4 in the example image below)
 - **fov_height**: number of FOVs spanning the image height (3 in the example image below)
 
-![CosMx FOV grid](./images/cosmx_fov_grid.png)
+<p align="center">
+    <img src="./images/cosmx_fov_grid.png" width="400">
+</p>
 
 
 The following fields are optional, and have the following purpose:
@@ -303,7 +309,9 @@ The Ashlar pipeline can now be used to generate one stitched image and `SpatialD
 
 1. Correctly stitch FOVs from the CosMx run. This is necessayr because when 'stitching' FOVs together, the default CosMx tools merely append FOV images to each other, without taking into account the overlap between adjacent FOVs (see example image below);
 
-![AtoMx poor stitching of adjacent FOVs](./images/atomx_poor_stitching.png =150x)
+<p align="center">
+    <img src="./images/atomx_poor_stitching.png" width="300">
+</p>
 
 2. Split the slide into its component samples, if applicable. This will enable parallel processing of different samples for downstream tasks, as well as the creation of 'composite' microscopy slides focused on samples of interest;
 3. Generate an initial `SpatialData` object (stored as a `.zarr` directory) for each sample, which will be essential for many downstream data visualization and analyses tasks. [Please review the `SpatialData` documentation for further details on this file format.](https://spatialdata.scverse.org/en/stable/)
@@ -334,7 +342,9 @@ Once the YAML file is ready, the pipeline can be run with:
 spatialhub ashlar make full -v5 -p20
 ```
 
-_NOTE:_ The first task in the `ashlar` pipeline involves creating a split copy of the `AtoMx` raw expression matrix and transcripts file. The purpose of this is to limit the memory needed to load the data in downstream tasks, thus leading to significant speed improvements. This task is run using a bash script, and adds a `split_exprMat` and `split_txFile` to the raw data folder. **This task will generate an incorrect output if these directories pre-existing and are not empty. Once it has been done, make sure not to remove the corresponding sentinel file(s) (`ashlar.dir/logs/[slide_id]_splitFlatFiles.sentinel`). If you wish to repeat this task, manually delete the `split_exprMat` and `split_txFile` first.**
+_NOTE:_ The first task in the `ashlar` pipeline involves creating a split copy of the `AtoMx` raw expression matrix and transcripts file. The purpose of this is to limit the memory needed to load the data in downstream tasks, thus leading to significant speed improvements. This task is run using a [bash script](../bash/cosmx_setup.sh), and adds a `split_exprMat` and `split_txFile` to the raw data folder. **This task will generate an incorrect output if these directories pre-exist and are not empty. Once it has been run, make sure not to remove the corresponding sentinel file(s) (`ashlar.dir/logs/[slide_id]_splitFlatFiles.sentinel`). If you wish to repeat this task, manually delete the `split_exprMat` and `split_txFile` first.**
+
+_DEBUGGING:_ For this specific project, adding the `AtoMx` segmentation mask to the `.zarr` stack triggered an error for a few of the samples. After running the command line above to generate `SpatialData` objects for most samples, we thus repeated the run with the pipeline temporarily pointing to [this version](../python/ashlar_zarr_debug.py) of the `.zarr` generation file, which filters out cells with missing coordinates from the `AtoMx` segmentation mask. **Only use this debugging script for samples that failed in first instance, otherwise it will remove valid cell masks from other segmentation masks.** In a future version of `spatialhub`, we aim to investigate this bug further and provide a more robust fix.
 
 
 #### 5.3. Reviewing outputs
@@ -343,9 +353,7 @@ Major outputs from this pipeline are stored in two new directories, which will b
 
 In addition to logs for all runs, the `ashlar.dir` directory contains one sub-directory per slide (to match the structure in the input raw data directory), each containing the following:
 
-- A `Morphology2D` directory, with symlinks to its component FOV TIFF files for each sample (intermediate output, necessary for [`ashlar`](https://labsyspharm.github.io/ashlar/) to run successfully);
+- A `Morphology2D` directory, with symlinks to each sample's component FOV TIFF files and blank FOV TIFF files in the correct sequence, if applicable (intermediate output, necessary for [`ashlar`](https://labsyspharm.github.io/ashlar/) to run successfully);
 - A `Stitched2D` directory, with one stitched TIFF image, one stitched transcripts file and one corrected FOV position file per sample. **Output in this directory may be handy for segmentation tools which do not accept `SpatialData` as input.**
 
-The `zarr.dir` directory will become our main data storage directory, and we will keep adding elements to it as we run through the `spatialhub` pipeline. For each slide and sample, it contains a `.zarr` directory gathering all relevant information in one place (microscopy image, transcripts data table, segmentation mask(s)...)
-
-**Reminder: some samples needed debugging (AtoMx mask)**
+The `zarr.dir` directory will become our main data storage directory, and we will keep adding elements to it as we run through the `spatialhub` pipeline. For each slide and sample, it contains a `.zarr` directory gathering all relevant information in one place (microscopy image, transcripts data table, segmentation mask(s)...). [Please review the `SpatialData` documentation for further details on this file format.](https://spatialdata.scverse.org/en/stable/)
