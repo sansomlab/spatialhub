@@ -39,13 +39,13 @@ Once a `CosMx` run is complete, a new microscopy slide will appear on the `AtoMx
 Once a study has been created, open it and click on 'EXPORT' (top left area of the screen, under the 'Study details' section) to retrieve the data:
 
 <p align="center">
-    <img src="./images/atomx_export_button.png" width="300">
+    <img src="./images/atomx_export_button.png" width="360">
 </p>
 
 Select all of the following files in the pop-up window that opens:
 
 <p align="center">
-    <img src="./images/atomx_export_files.png" width="600">
+    <img src="./images/atomx_export_files.png" width="720">
 </p>
 
 This pop-up window also states the SFTP information to use to access the data once the export is complete. For Kennedy users, you can use the following command and navigate to the directory of interest to copy the data to the BMRC:
@@ -90,7 +90,7 @@ The following fields are mandatory (the order they appear in does not matter):
 - **fov_height**: number of FOVs spanning the image height (3 in the example image below)
 
 <p align="center">
-    <img src="./images/cosmx_fov_grid.png" width="400">
+    <img src="./images/cosmx_fov_grid.png" width="480">
 </p>
 
 
@@ -323,7 +323,7 @@ The Ashlar pipeline can now be used to generate one stitched image and `SpatialD
 1. Correctly stitch FOVs from the CosMx run. This is necessayr because when 'stitching' FOVs together, the default CosMx tools merely append FOV images to each other, without taking into account the overlap between adjacent FOVs (see example image below);
 
 <p align="center">
-    <img src="./images/atomx_poor_stitching.png" width="300">
+    <img src="./images/atomx_poor_stitching.png" width="360">
 </p>
 
 2. Split the slide into its component samples, if applicable. This will enable parallel processing of different samples for downstream tasks, as well as the creation of 'composite' microscopy slides focused on samples of interest;
