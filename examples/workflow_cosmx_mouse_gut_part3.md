@@ -91,7 +91,7 @@ See also Bruker NanoString recommendations on the matter [here](https://nanostri
 In this study, we determined the top 800 HVGs (_after_ aggregating features at the CosMx probe level) for each of the 5 study datasets making up the combined atlas, and used the union of these 5 sets + all CosMx probes as our set of features (which resulted in ~3000 HVGs, i.e. ~3x the 1k panel). 
 
 
-### 1.4. Integration batch and covariate selection
+### 1.4. Batch and covariate selection for integration
 
 While it is possible to run `scANVI` without re-integrating the scRNA-seq atlas, [the developers point out that a `scANVI` model is likely to perform best if it is derived from a `scVI` model](https://docs.scvi-tools.org/en/1.3.0/user_guide/models/scanvi.html). Therefore, **you may need to determine a `batch_key` and covariates to integrate your scRNA-seq dataset across (even if it has been integrated in other ways for the purpose of your original analysis)**. 
 
