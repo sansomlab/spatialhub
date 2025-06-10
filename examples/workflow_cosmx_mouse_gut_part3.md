@@ -64,7 +64,7 @@ First, we recommend creating a probe name to gene name conversion table. This ca
 With this table at hand, you can easily convert the gene names in your reference atlas, and **aggregate your counts matrix at a level that is appropriate for your CosMx panel** - see `atlas_combine_datasets.py` in this [GitHub repo](https://github.com/sansomlab/IBD_mouse_scRNA-seq_atlas) for an example script (in Python).
 
 > [!NOTE]
-> While the current version of the `spatialhub_annot` pipeline needs fixing, we also point the user to the [`annot_prepare_reference.R` script](../R/annot_prepare_reference.R) for suggested ways of handling this pre-processing step.
+> While the current version of the `spatialhub_annot` pipeline needs fixing, we also point the user to the [`annot_prepare_reference.R` script](../R/annot_prepare_reference.R) for suggested ways of handling this pre-processing step (in R).
 
 
 ### 1.2. Label definition at the 'right' resolution
@@ -82,13 +82,13 @@ See also Bruker NanoString recommendations on the matter [here](https://nanostri
 `scANVI` relies on training a model to annotate cell types using a selected set of features. **We've found that the way these features are selected can have a large impact on the resulting predicted cell types.** When selecting features, we thus want to find a balance between:
 
 - Retaining enough of the highly variable genes (HVGs) from the original scRNA-seq atlas, to make sure that cell types as defined from this dataset are still properly differentiated when training the model;
-- Retaining all (most) of the probes in CosMx panel (for small-scale panels, e.g. 1k);
-- Ensuring that the number of HVGs that are not in the CosMx panel is not too large, otherwise predictions will be derived from too little information.
+- Retaining all (most) of the probes in CosMx panel (for small-scale panels, e.g. 1k) - unless focusing on very specific cell types;
+- Ensuring that the number of HVGs that are not in the CosMx panel is not too large, otherwise the mismatch between the information available when training the model on the reference vs. when predicting labels on the CosMx dataset is too large for accurate predictions.
 
 > [!TIP]
-> As a rule of thumb, we've found that a total number of HVGs largely exceeding 3x the size of the original CosMx panel is likely to lead to inaccurate predictions (as flagged by the `scANVI` pipeline). In doubt, default to using CosMx probes only as HVGs for integration, and double-check that the trained model accurately re-predicts the original annotations for a subset of the atlas (see [`jupyter` notebook](../notebooks/TO_BE_ADDED)]). In addition, note that this step is likely to be iterative, and you may need to run the full label transfer pipeline to completion before you can decide which HVGs to use.
+> As a rule of thumb, we've found that a total number of HVGs largely exceeding 3x the size of the original CosMx panel is likely to lead to inaccurate predictions (as flagged by the `scANVI` pipeline). In doubt, default to using CosMx probes only (or a subset of these for large CosMx panels) as HVGs for integration, and double-check that the trained model accurately re-predicts the original annotations for a subset of the atlas (see [`jupyter` notebook](../notebooks/TO_BE_ADDED)). In addition, remember that this step is likely to be iterative, and you may need to run the full label transfer pipeline to completion before you can decide which HVGs to use.
 
-In this study, we determined the top 800 HVGs (_after_ aggregating features at the CosMx probe level) for each of the 5 study datasets making up the combined atlas, and used the union of these 5 sets + all CosMx probes as our set of features (which resulted in ~3000 HVGs, i.e. ~3x the 1k panel). 
+In this study, we determined the top 800 HVGs (_after_ aggregating features at the CosMx probe level) for each of the 5 study datasets making up the combined atlas, and used the union of these 5 sets + all CosMx probes as our set of features (which resulted in ~3000 HVGs, i.e. ~3x the 1k panel) - see `atlas_combine_datasets.py` in this [GitHub repo](https://github.com/sansomlab/IBD_mouse_scRNA-seq_atlas) for details (lines 282-385). 
 
 
 ### 1.4. Batch and covariate selection for integration
