@@ -54,6 +54,9 @@ This pop-up window also states the SFTP information to use to access the data on
 sftp -P 22 username@kennedy.ox.ac.uk@eu.export.atomx.nanostring.eu
 ```
 
+OPTIONAL: To make the raw data accessible to other members in your user group, update the read and execute rights for directories and files using `chmod -R a+rX *` (executed within your raw data directory).
+
+
 > [!NOTE]
 > **Please refer to the latest [NanoString University documentation](https://university.nanostring.com/) for further details on how to use the `CosMx` suite of software, and especially [this manual](https://university.nanostring.com/cosmx-smi-data-analysis-user-manual).**
 
