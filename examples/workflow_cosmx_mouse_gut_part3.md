@@ -46,10 +46,11 @@ This step is highly study-specific, although it involves some common and essenti
 > 2. Split, regroup and/or exclude some of the cell types covered in your reference atlas, or look for further data to cover missing cell types, in order to best match the cell types that are expected in your CosMx dataset;
 > 3. Reconsider your strategy for HVG selection in light of the genes in your CosMx panel and cell types of interest;
 > 4. Reconsider your strategy for integration (batch covariates) in light of the batch effects found in _both_ your reference atlas and your CosMx study.
+> 
 > **Note that the decisions made in Steps 2 to 4 are not independent and highly iterative.**
 
 
-### 1.1. Gene names conversion
+### 1.1. ESSENTIAL: Gene names conversion
 
 Regardless of the atlas used, the conversion of gene names (symbols) used in the input scRNA-seq dataset to match CosMx probe names is essential because: 
 
