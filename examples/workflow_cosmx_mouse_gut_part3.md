@@ -57,10 +57,14 @@ Regardless of the atlas used, the conversion of gene names (symbols) used in the
 1. Some CosMx probes (and thus, some features in the counts matrix) are annotated with non-conventional gene symbols (which may happen in particular when using a custom panel, as in the case of this study);
 2. Some CosMx probes (including some in the standard panel) cover mutiple genes (e.g. _Ccl21a_, _Ccl21b_ and _Ccl21c_ all matching by the same _Ccl21a/b/c_ CosMx probe). 
 
-If you don't update your atlas gene names, you may therefore miss some essential information when performing label transfer.
+**If you don't update your atlas gene names, you may therefore miss some essential information when performing label transfer.**
+
+First, we recommend creating a probe name to gene name conversion table. This can be achieved by first running [`_retrieve_AnnotHub_db.R`](../R/_retrieve_AnnotHub_db.R) to retrieve Ensembl annotations for the Ensembl version(s) used in your reference atlas(es). Next, you can adapat [`_map_CosMx_panels.R`](../R/_map_CosMx_panels.R) to the case of your panel (especially if it is custom), reviewing databases like [GeneCards](https://www.genecards.org/) to resolve gene synonyms at best.
+
+With this table at hand, you can easily convert the gene names in your reference atlas, and **aggregate your counts matrix at a level that is appropriate for your CosMx panel** - see `atlas_combine_datasets.py` in this [GitHub repo](https://github.com/sansomlab/IBD_mouse_scRNA-seq_atlas) for an example script (in Python).
 
 > [!NOTE]
-> While the current version of the `spatialhub_annot` pipeline needs fixing, we point the user to the [`annot_prepare_reference.R` script](../R/annot_prepare_reference.R) for suggested ways of handling these pre-processing steps, or to `atlas_combine_datasets.py` in this [GitHub repo](https://github.com/sansomlab/IBD_mouse_scRNA-seq_atlas) for an alternative approach (in Python).
+> While the current version of the `spatialhub_annot` pipeline needs fixing, we also point the user to the [`annot_prepare_reference.R` script](../R/annot_prepare_reference.R) for suggested ways of handling this pre-processing step.
 
 
 ### 1.2. Label definition at the 'right' resolution
