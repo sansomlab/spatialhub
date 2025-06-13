@@ -356,8 +356,8 @@ df_long$gene_symbol[which(!(df_long$gene_symbol %in% ahub$gene))]
 
 df_long$gene_v93 <- df_long$gene_symbol
 
-ahub$gene[grep("^ATP5F1B|^ATP5E|^ATPSE", ahub$gene)] |> sort() |> unique()
-df_long$gene_v93[df_long$gene_symbol == "SLMO2-ATP5E"] <- "ATP5F1B"
+ahub$gene[grep("^ATP5F1B|^ATP5F1E|^ATP5E|^ATPSE", ahub$gene)] |> sort() |> unique()
+df_long$gene_v93[df_long$gene_symbol == "SLMO2-ATP5E"] <- "ATP5F1E"
 
 "C9orf16" %in% ahub$gene
 df_long$gene_v93[df_long$gene_symbol == "BBLN"] <- "C9orf16"
@@ -415,8 +415,8 @@ df_long$gene_symbol[which(!(df_long$gene_symbol %in% ahub$gene))]
 
 df_long$gene_v98 <- df_long$gene_symbol
 
-ahub$gene[grep("^ATP5F1B|^ATP5E|^ATPSE", ahub$gene)] |> sort() |> unique()
-df_long$gene_v98[df_long$gene_symbol == "SLMO2-ATP5E"] <- "ATP5F1B"
+ahub$gene[grep("^ATP5F1B|^ATP5F1E|^ATP5E|^ATPSE", ahub$gene)] |> sort() |> unique()
+df_long$gene_v98[df_long$gene_symbol == "SLMO2-ATP5E"] <- "ATP5F1E"
 
 "C9orf16" %in% ahub$gene
 df_long$gene_v98[df_long$gene_symbol == "BBLN"] <- "C9orf16"
@@ -468,8 +468,8 @@ df_long$gene_symbol[which(!(df_long$gene_symbol %in% ahub$gene))]
 
 df_long$gene_v110 <- df_long$gene_symbol
 
-ahub$gene[grep("^ATP5F1B|^ATP5E|^ATPSE", ahub$gene)] |> sort() |> unique()
-df_long$gene_v110[df_long$gene_symbol == "SLMO2-ATP5E"] <- "ATP5F1B"
+ahub$gene[grep("^ATP5F1B|^ATP5F1E|^ATP5E|^ATPSE", ahub$gene)] |> sort() |> unique()
+df_long$gene_v110[df_long$gene_symbol == "SLMO2-ATP5E"] <- "ATP5F1E"
 
 ahub$gene[grep("^SCYA4L|^CCL4L", ahub$gene)] |> sort() |> unique()
 df_long$gene_v110[df_long$gene_symbol == "CCL4L1"] <- NA  # probe capturing CCL4L2 as well
