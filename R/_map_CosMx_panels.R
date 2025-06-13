@@ -173,6 +173,7 @@ df_long$gene_v110[df_long$gene_symbol == "Lyz3"] <- "9530003J23Rik"
 df <- df_long |> dplyr::select(probe_name, gene_v87, 
                                gene_v93, gene_v98, gene_v110,
                                panel_type)
+df <- df[!duplicated(df), ]
 write.csv(df, row.names = FALSE, quote = FALSE, 
           file = "data/cosmx_mouse_ucc_1k_ensembl_mapping.csv")
 
@@ -503,5 +504,6 @@ df_long$gene_v110[which(!(df_long$gene_v110 %in% ahub$gene))]
 df <- df_long |> dplyr::select(probe_name, gene_v87, gene_v91, 
                                gene_v93, gene_v98, gene_v110,
                                panel_type)
+df <- df[!duplicated(df), ]
 write.csv(df, row.names = FALSE, quote = FALSE, 
           file = "data/cosmx_human_ucc_1k_ensembl_mapping.csv")
