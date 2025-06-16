@@ -29,7 +29,10 @@ min_area: 500  # minimal area (in square pixels) of a polygon for it to be consi
 min_nCount: 20
 
 
-# Memory required to read each SpatialData object
+# SpatialData to AnnData object conversion
 # ---------------
 
-mem_adata: 4 
+mem_adata: 4  # Memory needed to read sdata object
+include_ctrl_tx: True
+  # whether to aggregate transcripts table to counts table for 'main' transcripts only (e.g. standard panel),
+  # or for 'main' and control/negative probes (useful if planning to use AnnData for QC)

@@ -11,6 +11,7 @@ import pandas as pd
 import anndata as ad
 import scanpy as sc
 import sopa
+import dask.dataframe as dd
 
 ### PARAMETERS ###
 
@@ -21,6 +22,8 @@ parser.add_argument("--sampleKey", default="None", type=str,
                     help="unique sample_id as in samples.tsv file, referring to the sample to execute the script on")
 parser.add_argument("--fov2sample", default="samples.tsv", type=str,
                     help="path to the spatialhub samples TSV table")
+parser.add_argument("--includeCtrl", default=True, type=bool,
+                    help="whether to include control/negative probes when aggregating transcripts table to counts")
 
 args = parser.parse_args()
 
@@ -64,13 +67,15 @@ sdata['baysor'].index.name = None
 #sdata['baysor'].index
 
 # Subsetting sdata object to one single transcripts table, and renaming it as expected by default in SOPA
-sdata = sdata.subset(['image', 'baysor', 'tx_main'])
-sdata['transcripts'] = sdata['tx_main']
-del sdata['tx_main']
-sdata
+if args.includeCtrl == True:
+    sdata['transcripts'] = dd.concat([sdata['tx_main'], sdata['tx_ctrl']])
+else:
+    sdata['transcripts'] = sdata['tx_main']
+
+sdata = sdata.subset(['image', 'baysor', 'transcripts'])
 
 # Aggregate with SOPA, to enable aggregation by fluroescence intensity channel as well
-print("Aggregating main transcripts table using Baysor segmentation mask")
+print("Aggregating transcripts table using Baysor segmentation mask")
 sopa.aggregate(sdata, shapes_key = 'baysor', aggregate_channels = True)
 print(sdata)
 
@@ -135,6 +140,7 @@ del adata.uns
 # Save AnnData object
 print("Saving the following AnnData object:")
 print(adata)
-adata.write_h5ad(os.path.join(path2seg, 'anndata.h5ad'))
+adata.write_h5ad(os.path.join(path2seg, 'anndata.h5ad'), 
+                 compression = 'gzip')
 
 print("Done generating Baysor AnnData.")

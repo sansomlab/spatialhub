@@ -240,6 +240,7 @@ def baysorAnnData(infile, outfile):
     statement = '''python %(spatialhub_code_dir)s/python/baysor_anndata.py
                    --sampleKey=%(input_sample)s
                    --fov2sample=%(sample_table)s
+                   --includeCtrl=%(include_ctrl_tx)s
                    &> %(log_file)s
                 ''' % dict(PARAMS, **t.var, **locals())
     
