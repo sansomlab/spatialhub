@@ -308,12 +308,12 @@ adata.var.index[ctrl_filter]; adata = adata[:, ~ctrl_filter]
 
 # In the case of this custom panel, we also need to document our CosMx probe names properly
 # (i.e. correct typos/special characters in probe names)
-probes_annot = pd.read_csv("../metadata/cosmx_probes_updated.csv")
+probes_annot = pd.read_csv("../metadata/cosmx_mouse_custom_1k_corrected.csv")
 probes_annot.index = probes_annot['original']
 adata.var = adata.var.join(probes_annot)
 
 # Save object ready for integration and/or global cell type annotation
-adata.write_h5ad("anndata.dir/mouse_ibd_hh_atomx_filtered.h5ad")
+adata.write_h5ad("anndata.dir/mouse_ibd_hh_atomx_filtered.h5ad", compression = 'gzip')
 ```
 
 * * *
