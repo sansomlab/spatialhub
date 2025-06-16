@@ -222,11 +222,36 @@ def baysorFilter(infile, outfile):
     IOTools.touch_file(outfile)
 
 
+#@active_if()
+@transform(baysorFilter,
+           regex(r"(.*)/(.*)_baysorFilter.sentinel"),
+           r"\1/\2_baysorAnnData.sentinel")
+def baysorAnnData(infile, outfile):
+    '''
+    Generates one AnnData object per sample for the final Baysor mask
+    '''
+
+    t = T.setup(infile, outfile, PARAMS,
+                memory=PARAMS["mem_adata"],
+                cpu=1)
+    
+    input_sample = os.path.basename(outfile)[:-len("_baysorAnnData.sentinel")]
+
+    statement = '''python %(spatialhub_code_dir)s/python/baysor_anndata.py
+                   --sampleKey=%(input_sample)s
+                   --fov2sample=%(sample_table)s
+                   &> %(log_file)s
+                ''' % dict(PARAMS, **t.var, **locals())
+    
+    P.run(statement, **t.resources)
+    IOTools.touch_file(outfile)
+
+
 
 
 # --------------------- < generic pipeline tasks > -------------------------- #
 
-@follows(baysorFilter)
+@follows(baysorAnnData)
 def full():
     pass
 

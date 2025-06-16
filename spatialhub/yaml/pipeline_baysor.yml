@@ -27,3 +27,9 @@ toml_file: baysor_config.toml
 # Post-processing filtering thresholds
 min_area: 500  # minimal area (in square pixels) of a polygon for it to be considered as a cell
 min_nCount: 20
+
+
+# Memory required to read each SpatialData object
+# ---------------
+
+mem_adata: 4 

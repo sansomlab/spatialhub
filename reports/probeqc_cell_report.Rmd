@@ -47,14 +47,6 @@ library(tidyverse)
 
 ## Slide overview
 
-This dataset covers the following number of FOVs per slide:
-
-```{r}
-table(qc_fov$slide_id)
-```
-
-* * *
-
 **The following sample(s) are found on each slide:**
 
 ```{r}
