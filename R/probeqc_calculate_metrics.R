@@ -163,12 +163,17 @@ if (file_extension == "h5ad") {
 
 stopifnot("'slide_id' not found in metadata" = "slide_id" %in% names(colData(sce)))
 
-if (!("fov" %in% names(colData(sce)))) {
+if (!("fov" %in% names(colData(sce)))) {  # e.g. if using a mask other than AtoMx default
 
+  # Assert that there are not conflicts with the YAML options regarding FOV QC
   stopifnot("cannot run FOV QC: 'fov' variable not found in metadata" = opt$runFOVqc == FALSE)
   
   sample_key = ("sample_id" %in% names(colData(sce))) | ("sample_name" %in% names(colData(sce)))
   stopifnot("at least one of 'fov', 'sample_id' or 'sample_name' must appear in metadata" = sample_key)
+
+  # Remove FOV information from sample metadata
+  fov2sample <- fov2sample |> dplyr::select(-fov)
+  fov2sample <- fov2sample[!duplicated(fov2sample), ]
 
 }
 
@@ -179,7 +184,8 @@ sce_meta$cell_index <- colnames(sce)
 sce_meta <- sce_meta |> dplyr::select(cell_index, everything())
 
 matching_vars <- intersect(names(sce_meta), names(fov2sample))
-spx_meta <- plyr::join(sce_meta, fov2sample, by = matching_vars)
+spx_meta <- plyr::join(sce_meta, fov2sample, by = matching_vars, 
+                       type = 'left', match = 'first')
 rownames(spx_meta) <- spx_meta$cell_index
 
 if (all(rownames(spx_meta) == rownames(colData(sce)))) {
@@ -198,6 +204,10 @@ if ("counts" %in% names(sce@assays@data)) {
 } else {
   stop("Raw counts not found. Please store as 'counts' or 'X' slot in sce@assays@data")
 }
+
+# Explicitely set matrix row and column names (essential when using 'reader = "R"' with zellkonverter)
+rownames(counts_mat) <- rownames(sce)
+colnames(counts_mat) <- colnames(sce)
 
 
 ### Handle optional arguments
@@ -645,7 +655,8 @@ keepVar <- sort(which(names(dfa) %in% c(sample_qc_vars,
                   "qcFlagSample_summary")
                   )
                 )
-dfs <- dfa[, keepVar] |> dplyr::select(-fov)
+if ("fov" %in% keepVar) { keepVar <- keepVar[keepVar != "fov"] }
+dfs <- dfa[, keepVar] #|> dplyr::select(-fov)
 dfs <- dfs[!duplicated(dfs), ]
 dfs <- dfs[!is.na(dfs$sample_id), ]
 rownames(dfs) <- 1:nrow(dfs)
