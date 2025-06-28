@@ -96,12 +96,20 @@ The output segmentation mask will be automatically added to the `zarr.dir` direc
 
 * * *
 
+## Assessing segmenation masks
+
+For a quick review and QC of a given segmentation mask (especially, as generated from running the `baysor` pipeline, see this [`jupyter` notebook](https://github.com/sansomlab/spatialhub/blob/main/notebooks/segmentation_review_baysor.ipynb).
+
+**Add note on using Napari**
+
+
+* * *
 
 ## For developers: Misc lessons from piloting segmentation tools
 
 Converting output segmentation masks to a compatible `SpatialData` shapes object can be tricky. If trying to solve this problem for other tools, see for example how it was solved for the `AtoMx` and `baysor` masks in the following scripts:
 
-### `baysor_filter.py` lines 61-67 
+### a) `baysor_filter.py` lines 61-67 
 
 Although the `GeoJSON` format should be straightforward to import as a `GeoPandas` dataframe, we've often run into issues (documented on GitHub for old versions of `baysor`), sovled by using the following filter for invalide geometries:
 
@@ -115,7 +123,7 @@ baysor_mask = baysor_mask[baysor_mask['geometry'].is_valid]
 print(baysor_mask)
 ```
 
-### `ashlar_zarr.py` lines 156-227
+### b) `ashlar_zarr.py` lines 156-227
 
 This is an example of manually converting a segmentation mask provided as a flat data table to a `shapely` geometry object and eventually `SpatialData` object. Note that for samples/FOVs, we've found this script to fail due to invalid geometries... hence the `ashlar_zarr_DEBUG.py` script, which should **ONLY** be used when the default `ashlar_zarr.py` script failed, lest some relevant cells are lost from other samples/FOVs.
 
@@ -176,3 +184,6 @@ dfs_atomx = models.ShapesModel.parse(polygon_gdf)
 sdata['atomx'] = dfs_atomx
 ```
 
+### c) other
+
+`SOPA` also includes a tool to support conversion of different segmentation mask for compatibility with the `SpatialData` format - see for example [this script](https://github.com/sansomlab/spatial_tx/blob/main/M2_segmentation/cellpose/cellpose_conversion.py); however, they require a lot of resources!
