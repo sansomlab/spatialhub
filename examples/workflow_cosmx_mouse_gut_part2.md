@@ -41,13 +41,17 @@ Here is an overview of where to find key files:
 
 ## Option 1: Using image-based tools
 
-For re-segmentation using image-based tools, **`spatialhub` currently builds on top of the [`SOPA`](https://gustaveroussy.github.io/sopa/) implementation of [`cellpose`](https://cellpose.readthedocs.io/en/latest/). We thus recommend reading the documentation for both tools for additional details.**
+Image-based segmentation tools rely on the fluorescence microscopy image acquired on the `CosMx` device to define cell types. Note that any registered microscopy image could also be used (work in progress in the Hallou lab). The default `AtoMx` mask itself is derived from `cellpose`.
 
+
+### SOPA-cellpose
+
+For re-segmentation using image-based tools, **`spatialhub` currently builds on top of the [`SOPA`](https://gustaveroussy.github.io/sopa/) implementation of [`cellpose`](https://cellpose.readthedocs.io/en/latest/). We thus recommend reading the documentation for both tools for additional details.**
 
 > [!NOTE]
 > `SOPA` is well suited to enable fast re-segmentation, since it patches the image and parallelize the segmentation to run on each patch before (properly) stitching the segmentation mask pieces into one (unlike `AtoMx` tools, which just append pieces of the segmentation mask next to each other without resolving conflicts at the boundaries). At this stage, we have only implemented the `cellpose` tool from `SOPA` into `spatialhub`, but the `sopa_segment_img` pipeline could be expanded to cover more tools (please refer to `SOPA` Read The Docs for available image-based segmentation tools).
 
-After running `spatialhub ashlar`, you can readily run the `sopa_segment_img` within the same directory, since the input files will be fetched from the `zarr.dir` directory created by Ashlar, using the following commands:
+After running `spatialhub ashlar` with the `create_zarr` parameter set to True, you can readily run the `sopa_segment_img` pipeline within the same directory, since the input files will be fetched from the `zarr.dir` directory created by Ashlar, using the following commands:
 
 ```
 spatialhub sopa_segment_img config
@@ -61,15 +65,114 @@ The output segmentation mask will be automatically added to the `zarr.dir` direc
 > [!TIP]
 > The best results with `cellpose` are likely to be achieved when running it based on a custom, re-trained model (see [`cellpose` tutorial here](https://cellpose.readthedocs.io/en/latest/gui.html#training-your-own-cellpose-model)). If using a pre-trained model, we've had most success with the `nuclei`, `cyto3` and `tissuenet_cp3` models (see [here for a full list of available `cellpose` pre-trained modes](https://cellpose.readthedocs.io/en/v3.1.1.1/models.html#full-built-in-models).
 
+In the case of this specific study, the best results were obtained with the `cellpose nuclei` model, although we did not retain it as it misses a large area (cytoplasm) of manuy cells (notably, epithelial cells).
+
 * * *
 
 
 ## Option 2: Using transcripts-based tools
 
-```
-spatialhub sopa_segment_tx config
-```
+Transcripts-based segmentation tools take advantage of transcripts information (on top of the microscopy image, if using an image-based mask as prior) to determine cell boundaries. Such tools notably include [`baysor`](https://github.com/kharchenkolab/Baysor) and [`proseg`](https://github.com/dcjones/proseg). 
+
+> [!NOTE]
+> 1. `spatialhub` currently includes a `sopa_segment_tx` pipeline, which builds on top of `SOPA` and its patching capability to perform segmentation using `baysor`. While this pipeline can work, it does not seem to interface correctly with `dask` in the backend, and thus requires a lot of memory, thereby defeating the purpose of using `SOPA-baysor` rather than `baysor` straightaway.
+> 2. While we have successfully completed some `proseg` runs, we've consistently found `baysor` results of superior quality. At this stage, `spatialhub` thus only implements `baysor`. (See [here](https://github.com/sansomlab/spatial_tx/tree/main/M2_segmentation/proseg) for an example of how to run `proseg` on one sample from this CosMx mouse study outside of the `spatialhub` pipeline)
+
+### `baysor`
+
+After running `spatialhub ashlar`, you can readily run the `baysor` pipeline within the same directory, since the input files will be fetched from the `ashlar.dir` directory created by Ashlar, using the following commands:
 
 ```
-spatialhub sopa_segment_tx make full -v5 -p20
+spatialhub baysor config
+spatialhub baysor make full -v5 -p20
 ```
+
+In addition to a YAML file, which handles the `spatialhub` add-on functionalities (including, additional cell filtering criteria), you will also need a TOML file to specify the desired `baysor` parameters, such as [this TOML file](https://github.com/kharchenkolab/Baysor/blob/master/configs/example_config.toml). Please refer to the `baysor` documentation for details of what each of these parameters mean.
+
+The output segmentation mask will be automatically added to the `zarr.dir` directory, using `baysor` as a key. (If a mask with key `baysor` already exists in the `SpatialData` object, this pre-existing mask will be renamed `baysor_old`.)
+
+> [!TIP]
+> If [running `baysor` with a prior](https://kharchenkolab.github.io/Baysor/dev/segmentation/#Using-a-prior-segmentation) (recommended), we've found that using a high-quality image-based segmentation mask with a high prior confidence score (>0.8) provides the best results. This differs from the default recommended setting, which assumes a low confidence score of 0.2 for the prior.
+
+* * *
+
+
+## For developers: Misc lessons from piloting segmentation tools
+
+Converting output segmentation masks to a compatible `SpatialData` shapes object can be tricky. If trying to solve this problem for other tools, see for example how it was solved for the `AtoMx` and `baysor` masks in the following scripts:
+
+### `baysor_filter.py` lines 61-67 
+
+Although the `GeoJSON` format should be straightforward to import as a `GeoPandas` dataframe, we've often run into issues (documented on GitHub for old versions of `baysor`), sovled by using the following filter for invalide geometries:
+
+```
+# Import JSON polygon file
+print("Importing JSON segmentation file (removing invalid geometries)")
+baysor_mask = gpd.read_file(os.path.join(path2seg, 'segmentation_polygons_2d.json'), on_invalid = 'warn')
+
+# Filter out invalid geometries (there should be none in latest releases of baysor...)
+baysor_mask = baysor_mask[baysor_mask['geometry'].is_valid]
+print(baysor_mask)
+```
+
+### `ashlar_zarr.py` lines 156-227
+
+This is an example of manually converting a segmentation mask provided as a flat data table to a `shapely` geometry object and eventually `SpatialData` object. Note that for samples/FOVs, we've found this script to fail due to invalid geometries... hence the `ashlar_zarr_DEBUG.py` script, which should **ONLY** be used when the default `ashlar_zarr.py` script failed, lest some relevant cells are lost from other samples/FOVs.
+
+```
+# import original segmentation mask for corresponding FOVs
+print("Loading segmentation mask for relevant FOVs")
+
+atomx_ls = []
+for fov in fov_ls:
+  # open file
+  k = 5 - len(str(fov))
+  file = os.path.join(path2seg, 'CellBoundaries_F' + '0'*k + str(fov) + '.csv')
+  df_atomx = pd.read_csv(file)
+  atomx_ls = atomx_ls + [df_atomx]
+
+df_atomx = pd.concat(atomx_ls)
+print(df_atomx)
+
+# Convert coordinates from local to global in newly stitched image: 
+print("Converting x,y shape points to new coordinates system")
+
+# reformat as one list of paired coordinates per cell, as will be needed for later conversion to geopandas
+df_atomx["atomx_index"] = "FOV" + df_atomx["fov"].astype(str) + "_C" + df_atomx["cellID"].astype(str)
+cell_ids = list(set(df_atomx['atomx_index'].to_list()))
+
+df_ls = [y for x, y in df_atomx.groupby("atomx_index")]
+#df_ls[0]
+
+coords_ls = []
+for dfk in df_ls:
+        
+  # dfk = set of polygon coordinates for cell k
+  dfk.index = range(0, len(dfk))  # re-index from zero to n-1
+
+  # update coordinates from local to global, using Ashlar's FOV position file
+  fov = dfk['fov'][0]
+  f = (ashlar_df['FOV'] == fov)
+  x = ashlar_df[f].iloc[0]['Position_X']; y = ashlar_df[f].iloc[0]['Position_Y']
+  dfk['x_global'] = dfk['x_local'] + x; dfk['y_global'] = dfk['y_local'] + y
+
+  # store as list for conversion to Shapely polygon
+  coords_k = []
+  for i in range(0, len(dfk)):
+    coords_k = coords_k + [[dfk['x_global'][i], dfk['y_global'][i]]]
+    coords_ls = coords_ls + [shapely.Polygon(coords_k)]
+
+len(coords_ls)
+
+# convert to geopandas format
+print("Transforming to GeoPandas object for compatibility with SpatialData")
+polygon_gdf = gpd.GeoDataFrame(geometry=coords_ls)
+polygon_gdf["atomx_index"] = cell_ids
+polygon_gdf
+
+# convert to zarr compatible format
+print("Adding shapes element to SpatialData")
+dfs_atomx = models.ShapesModel.parse(polygon_gdf)
+sdata['atomx'] = dfs_atomx
+```
+
