@@ -38,6 +38,12 @@ Here is an overview of where to find key files:
 
 ## Option 1: Using image-based tools
 
+For re-segmentation using image-based tools, **`spatialhub` currently builds on top of the [`SOPA`](https://gustaveroussy.github.io/sopa/) implementation of [`cellpose`](https://cellpose.readthedocs.io/en/latest/). We thus recommend reading the documentation for both tools for additional details.**
+
+
+> [!NOTE]
+> `SOPA` is well suited to enable fast re-segmentation, since it patches the image and parallelize the segmentation to run on each patch before (properly) stitching the segmentation mask pieces into one (unlike `AtoMx` tools, which just append pieces of the segmentation mask next to each other without resolving conflicts at the boundaries). At this stage, we have only implemented the `cellpose` tool from `SOPA` into `spatialhub`, but the `sopa_segment_img` pipeline could be expanded to cover more tools (please refer to `SOPA` Read The Docs for available image-based segmentation tools).
+
 ```
 spatialhub sopa_segment_img config
 ```
