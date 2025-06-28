@@ -80,7 +80,7 @@ In each slide's directory, copy the following sub-directories and files, using t
 * * *
 
 
-### Step 3: Create a `spatialhub` samples.tsv file
+## Step 3: Create a `spatialhub` samples.tsv file
 
 [This metadata file](./files/mouse_ibd_hh_spatialhub_samples.tsv) is essential to run and parallelize jobs in the `spatialhub` pipeline. 
 
