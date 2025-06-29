@@ -100,9 +100,6 @@ The output segmentation mask will be automatically added to the `zarr.dir` direc
 
 For a quick review and QC of a given segmentation mask (especially, as generated from running the `baysor` pipeline, see this [`jupyter` notebook](https://github.com/sansomlab/spatialhub/blob/main/notebooks/segmentation_review_baysor.ipynb).
 
-**Add note on using Napari**
-
-
 * * *
 
 ## For developers: Misc lessons from piloting segmentation tools
