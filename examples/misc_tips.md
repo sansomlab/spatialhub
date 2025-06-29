@@ -54,3 +54,41 @@ adata.obsm['spatial'] = coords
 
 If you don't already have the cell (segment) centroid coordinates, you can generate them from any `SpatialData` object using the [`spatialdata.get_centroids()`](https://spatialdata.scverse.org/en/stable/api/operations.html#spatialdata.get_centroids) function (but **beware of coordinate system compatibilities between tools**: for example, we've noticed the coordinates output by `baysor` are not the same as those re-calculated by `spatialdata` using `get_centroids()`, due to different coordinate reference systems and spatial projections used - [see this GeoPandas guideline on the matter](https://geopandas.org/en/stable/docs/user_guide/projections.html)).
 
+* * *
+
+
+## Data clean-up tools
+
+The following tools can be particularly useful ahead of running spatial analyses e.g. with [`MuSpAn`, to make sure the spatial area within which to calculate spatial statistics is correctly defined](https://docs.muspan.co.uk/latest/_collections/getting_started/Getting%20Started%20-%205%20-%20Estimating%20boundaries.html).
+
+### Using Napari to define a region of interest (ROI)
+
+To [use Napari with `SpatialData`](https://spatialdata.scverse.org/projects/napari/en/latest/notebooks/spatialdata.html#visualise-in-napari), install the following in a fresh python environment:
+
+```
+python -m pip install "napari[all]"
+python -m pip install "spatialdata[extra]"
+```
+
+Then, run this in an interactive python session enabling to open a GUI (this may be easier achieved by downloading the desired `.zarr` data on a local computer rather than setting up a GUI on the BMRC):
+
+```
+zarr_path = 'zarr.dir/NL4S3a/D21_dist1.zarr'
+sdata = sd.read_zarr(zarr_path + '.zarr')
+Interactive(sdata)  # launches an interactive napari window
+```
+
+In the interactive Napari session, double-click on the elements (`global` for the coordinates system of choice, which will then make the associated `image`, `transcripts`, `atomx`, etc. elements appear) in the bottom-left widget.
+
+You can then create a new Shapes layer to define your ROI, rename it as desired, and save it by pressing shift+E. Next, exit the Napari viewer and save your updated `SpatialData` object.
+
+> [!TIP]
+> Once a Shapes ROI is defined, you can extract the index of all cells (segments) that fall within this ROI using `spatialhub roi` (see [configuration YAML file](https://github.com/sansomlab/spatialhub/blob/main/spatialhub/yaml/pipeline_roi.yml) for details).
+
+
+### Creating a 'composite' microscopy slide
+
+Once you've cleaned up your dataset and discarded low-quality samples/cells, it may be useful to generate a 'composite' microscopy slide where empty areas are removed. You can also sort/align samples by donor, condition of interest, etc. for more intuitive spatial visualization of the dataset.
+
+**Example script to be added** (Reminder: Current script mirrors coordinates)
+
