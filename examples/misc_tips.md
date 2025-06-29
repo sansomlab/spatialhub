@@ -34,7 +34,23 @@ Once you have a `SpatialData` object including minimally a transcripts coordinat
 
 ### From `AnnData` to `SpatialData`
 
+If you've independently generated a `AnnData` and `SpatialData` object(s) for your project, as is likely to be the case if using `spatialhub`, you can easily link the two as long as the cell (segment) indexes in your `adata.obs_names` match those used in your `SpatialData`'s segmentation mask, and the `adata.uns['spatialdata_attrs']` dictionary is specified correctly (see section above).
 
+**Example script to be added**
 
 
 ### From `AnnData` to `spatial AnnData` (legacy format)
+
+Finally, you may want to use the legacy spatial `AnnData` (`squidpy`) format, which was the typical `python` structure for spatial transcriptomics datasets before the scverse introduced the `SpatialData` format. Some tools such as [`Squidpy`](https://squidpy.readthedocs.io/en/stable/) or [`SPIN`](https://github.com/wanglab-broad/spin) still expect this structure.
+
+To turn a standard `AnnData` into a `spatial AnnData` object, simply store the cell (segment) centroid coordinates as a `numpy` array in `adata.obsm['spatial']` (you could use any key other than 'spatial' to store this array, but most tools will by default look for centroid coordinates in the 'spatial' slot), like this:
+
+```
+# Assuming df is a Pandas dataframe (e.g. adata.obs) listed coordinates for all cells
+coords = df[['CenterX_sample_px', 'CenterY_sample_px']].copy()
+coords = coords.to_numpy()
+adata.obsm['spatial'] = coords
+```
+
+If you don't already have the cell (segment) centroid coordinates, you can generate them from any `SpatialData` object using the [`spatialdata.get_centroids()`](https://spatialdata.scverse.org/en/stable/api/operations.html#spatialdata.get_centroids) function (but **beware of coordinate system compatibilities between tools**: for example, we've noticed the coordinates output by `baysor` are not the same as those re-calculated by `spatialdata` using `get_centroids()`, due to different coordinate reference systems and spatial projections used - [see this GeoPandas guideline on the matter](https://geopandas.org/en/stable/docs/user_guide/projections.html)).
+
