@@ -44,14 +44,13 @@ df.index = [0]
 print(df)
 slideName = list(set(df["slide_id"]))[0]
 sampleName = list(set(df["sample_name"]))[0]
-print("Filtering baysor segmentation mask for:", sampleName, slideName)
+print("Filtering segmentation mask for:", sampleName, slideName)
 
 
 # Define paths to source and destination directories for corresponding sample
 path2zarr = f"zarr.dir/{slideName}/{sampleName}.zarr"
 outDir = f"roi.dir/{args.segMask}/{slideName}/"
-if not os.path.exists(outDir):
-    os.mkdir(outDir)
+os.makedirs(outDir, exist_ok=True)
 
 
 ### TASKS ###

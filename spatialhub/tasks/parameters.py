@@ -89,7 +89,7 @@ def get_parameter_file(pipeline_path):
                 cmd = pipeline_name.replace("pipeline_","").split(".")[0]
 
                 raise ValueError('local configuration file missing. Please e.g. run '
-                                '"txseq ' + cmd +  ' config" to check'
+                                '"spatialhub ' + cmd +  ' config" to check'
                                 'out a local copy of the default file')
                 
                 

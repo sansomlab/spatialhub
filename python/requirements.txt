@@ -41,13 +41,15 @@ notebook
 muspan
 networkx
 'plotly[express]'
+notebook
+'scanpy[leiden]'
+louvain
+harmonypy
 
 
 ### DRAFT requirements TBC ###
 
 packaging
-notebook
-'scanpy[leiden]'
 torch
 tf-keras
 harmonypy
