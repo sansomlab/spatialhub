@@ -1,0 +1,37 @@
+#
+# Pipeline pipeline_muspanPCF.py configuration file
+# ==================================================
+#
+
+# General options
+# ---------------
+
+# Location of the samples.tsv table
+# (see documentation for details)
+sample_table: ../metadata/HNSCC_spatialhub_samples_baysor_scanvi.tsv
+
+# Location of the cell type annotation data table, include cell types and cell centroid coordinates
+annotation_file: ./annotation/HNSCC_baysor/scANVI_conflict_resolution/HNSCC_baysor_metadata_scANVI_tumor_cellbender_annotations.csv
+
+# Segmentation mask the annotations are derived from
+segmentation_mask: baysor
+
+# Requested memory:
+mem: 4
+
+
+# Define MuSpAn parameters
+# ---------------
+
+# Name of variable in annotation file containing the cell types to calculate spatial statistics for
+celltype_key: celltype_level1
+
+# Minimal number of cells in a cell type population for it to be included in the analysis
+min_population_size: 30
+
+# Parameters passed on to MuSpAn function (see https://docs.muspan.co.uk/latest/generated/muspan.spatial_statistics.cross_pair_correlation_function.html)
+max_radius: 2500  # in same unit as the coordinates in your annotation file (1500 px ~ 180 um for CosMx)
+annulus_step: 10  # the smaller, the smoother the curve
+
+# Whether to calculate the Ripley's K statistic in addition to the PCF function (the 2 are correlated)
+calculate_RipK: False 
