@@ -1,0 +1,25 @@
+#
+# Pipeline pipeline_extractCoords.py configuration file
+# ==================================================
+#
+
+# General options
+# ---------------
+
+# Location of the samples.tsv table
+# (see documentation for details)
+sample_table: /users/sansom/tme871/work/kir032_morrell_cosmx_cancer/shared/cosmx/metadata/HNSCC_spatialhub_samples.tsv
+
+
+# Mask to retrieve centroid coordinates for
+# ---------------
+
+# Spelling should match those used in the SpatialData object
+# SpatialData objects are assumed to be saved in a dedicated .zarr directory within your spatialhub directory
+# with one sub-directory per slide and one directory (.zarr) per sample
+# (such a .zarr directory would be created e.g. after running the Ashlar pipeline)
+segmentation_mask: 'atomx'
+segment_index: 'atomx_index'
+
+# Memory required to read SpatialData object
+mem_adata: 8 
