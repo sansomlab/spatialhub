@@ -199,7 +199,7 @@ def baysorFilter(infile, outfile):
     '''
 
     t = T.setup(infile, outfile, PARAMS,
-                memory=PARAMS["mem"],
+                memory=PARAMS["mem_adata"],
                 cpu=1)
     
     input_sample = os.path.basename(outfile)[:-len("_baysorFilter.sentinel")]
