@@ -2,6 +2,8 @@
 
 This documents points to more resources and lessons learned from working with `CosMx` data and developing `spatialhub`.
 
+**Most of the code described here is (or will soon be) available as utils function in R and/or Python, as described in these scripts: [`R/_clean-up_utils.R`](../R/_clean-up_utils.R) and/or [`spatialhub/tasks/adata_utils.py`](../spatialhub/tasks/adata_utils.py)
+
 
 ## Converting between python formats
 
@@ -90,5 +92,5 @@ You can then create a new Shapes layer to define your ROI, rename it as desired,
 
 Once you've cleaned up your dataset and discarded low-quality samples/cells, it may be useful to generate a 'composite' microscopy slide where empty areas are removed. You can also sort/align samples by donor, condition of interest, etc. for more intuitive spatial visualization of the dataset.
 
-**Example script to be added** (Reminder: Current script mirrors coordinates)
+(See function in `R/_clean-up_utils.R` and/or `spatialhub/tasks/adata_utils.py`)
 
