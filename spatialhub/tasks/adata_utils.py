@@ -80,4 +80,79 @@ def adata_from_cosmx(path2flatFiles,
 
 
 
-# ------------------------------ Functions => working from spatial data object ------------------------------ #
+# ------------------------------ Useful code for updating (spatial) AnnData objects ------------------------------ #
+
+# DRAFT: These need to be written up as proper functions
+
+
+### 1) Adding per *sample* coordinates to an AnnData object collating several samples ###
+
+# REQUIREMENT: First, run the 2 following pipeline tasks:
+# spatialhub ashlar make full -v5 -p20
+# spatialhub extractCoords make full -v5 -p20
+
+# Import AnnData to which sample coordinates need to be appended
+adata = sc.read_h5ad(path2adata)
+
+# Retrieve per sample coordinates, as re-calculated with `ashlar`
+# and extracted from each SpatialData object with `extractCoords`
+seg_mask = 'atomx'
+coords_files = glob.glob(os.path.join("coordinates.dir/", seg_mask, "*", "*_sampleCoords.csv"))
+coords_list = []
+for file in coords_files:
+    df = pd.read_csv(file)
+    coords_list = coords_list + [df]
+
+coords_df = pd.concat(coords_list, axis=0, ignore_index=True)
+
+# Current index is unique at the *sample* level => make it unique at the global level
+coords_df.index = coords_df['Unnamed: 0'] + '_' + coords_df['slide_id']  # should work for all seg_mask, but need further testing
+
+# Match indexes in coords_df and AnnData
+coords_df = coords_df[coords_df.index.isin(adata.obs_names)]
+coords_df = coords_df.reindex(adata.obs_names)
+if adata.obs.index.equals(coords_df.index):
+    adata.obs['CenterX_sample_px'] = coords_df['CenterX_sample_px']
+    adata.obs['CenterY_sample_px'] = coords_df['CenterY_sample_px']
+
+# return adata
+
+
+### 2) Create composite slide coordinates ###
+
+# Function to create a 'composite' spatial coordinates space,
+# thus gathering all samples on one single 'slide' and removing empty space.
+
+# REQUIREMENT: First, extract per-sample coordinates (as enabled by the function above) 
+# RECOMMENDED: Run QC to remove exclude low-quality samples from the 'composite' slide
+#   => this will remove as much blank space as possible from the new 'composite' coordinates system.
+# NOTE: Different analyses may highlight different QC issues and require a different sample filtering
+#   (e.g. some samples may be dropped after probe QC, after cell type annotation, after SPIN...)
+#   => it may be worth re-creating a composite slide accordingly after each analysis.
+
+# See corresponding R/_clean-up_utils.R function, which would be useful to translate as a python function here
+
+
+### 3) Converting from spatial coordinates in adata.obsm to a 'spatial' obsm object  ###
+
+# RECOMMENDED: Depending on needs for downstream analyses, use sample-level or composite slide coordinates (as may be generated with the functions above)
+# rather than original coordinates (which only make sense for one microscopy slide, not for the whole project if it includes multiple slides).
+
+# Import AnnData to which sample coordinates need to be appended
+adata = sc.read_h5ad(path2adata)
+
+x_coord_key = 'CenterX_composite_px'; y_coord_key = 'CenterY_composite_px' 
+coords = adata.obs[[x_coord_key, y_coord_key]].copy()
+coords = coords.to_numpy()
+
+spatial_key = 'spatial'
+    # NOTE: by default, anlyses tools relying on this .obsm slot (e.g. Squidpy or SPIN) expect the key to be named 'spatial'
+    #   However, if you want to use this slot for visualization in cellxgene, you need to use 'X_spatial' as a key.
+adata.obsm[spatial_key] = coords
+
+# return adata
+
+
+### 4) Filter AnnData based on a region of interest, e.g. manually drawn in Napari ###
+
+# See corresponding R/_clean-up_utils.R function, which would be useful to translate as a python function here
