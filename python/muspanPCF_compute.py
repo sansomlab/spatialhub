@@ -183,7 +183,7 @@ if args.calcRipK:
                 )
 
                 # Store PCF results in data frame
-                ripK_df[celltype_i + '_vs_' + celltype_j] = pd.DataFrame(PCF_ij)
+                ripK_df[celltype_i + '_vs_' + celltype_j] = pd.DataFrame(ripK_ij)
 
     # Save final results
     print("Saving Ripley's K results")
