@@ -2,7 +2,7 @@
 
 This documents points to more resources and lessons learned from working with `CosMx` data and developing `spatialhub`.
 
-**Most of the code described here is (or will soon be) available as utils function in R and/or Python, as described in these scripts: [`R/_clean-up_utils.R`](../R/_clean-up_utils.R) and/or [`spatialhub/tasks/adata_utils.py`](../spatialhub/tasks/adata_utils.py)
+**Most of the code described here is (or will soon be) available as utils function in R and/or Python, as described in these scripts: [`R/_clean-up_utils.R`](../R/_clean-up_utils.R) and/or [`spatialhub/tasks/adata_utils.py`](../spatialhub/tasks/adata_utils.py)**
 
 
 ## Converting between python formats
