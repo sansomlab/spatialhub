@@ -192,10 +192,13 @@ def sopaBaysor(infile, outfile):
     # SOPA-Baysor parameters
     sample_zarr = os.path.join(f"sopa.segment.dir/{slideName}/", sampleName + ".zarr")
 
-    statement = '''sopa segmentation baysor %(sample_zarr)s \
-                   --config '"%(bs_toml)s"' \
-                   --min-area %(bs_cell_area)s \
-                   &> %(log_file)s
+    statement = '''module purge; \
+                   module load Python/3.10.8 Baysor/0.7.1; \
+                   export export SOPA_PARALLELIZATION_BACKEND=thread; \
+                   sopa segmentation baysor %(sample_zarr)s \
+                       --config '"%(bs_toml)s"' \
+                       --min-area %(bs_cell_area)s \
+                       &> %(log_file)s
                 ''' % dict(PARAMS, **t.var, **locals())
     
     P.run(statement, **t.resources)
