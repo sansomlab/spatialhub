@@ -8,20 +8,36 @@ OUTDIR = config["outdir"]
 THREADS = config.get("threads", 8)
 MEM_IN_GB = config.get("mem_in_gb", 16)
 
+BIN_SIZE = [2, 8, 16]
+CUSTOM_BIN_SIZE = config.get("custom_bin_size", None)
+if CUSTOM_BIN_SIZE:
+    BIN_SIZE += [CUSTOM_BIN_SIZE]
+FMT_BIN_SIZE = [f"{bsize:03}" for bsize in BIN_SIZE]
+CUSTOM_BIN_SIZE_CMD = f"--custome-bin-size {CUSTOM_BIN_SIZE}" if CUSTOM_BIN_SIZE else ""
+
 
 rule target:
     input:
-        expand(f"{OUTDIR}/{{smp}}/outs/filtered_feature_bc_matrix.h5", smp=SAMPLES),
+        expand(
+            f"{OUTDIR}/{{smp}}/outs/binned_outputs/square_{{fbsize}}um/filtered_feature_bc_matrix.h5",
+            smp=SAMPLES,
+            fbsize=FMT_BIN_SIZE,
+        ),
 
 
 rule spaceranger_count:
     output:
-        f"{OUTDIR}/{{smp}}/outs/filtered_feature_bc_matrix.h5",
+        expand(
+            f"{OUTDIR}/{{smp}}/outs/binned_outputs/square_{{fbsize}}um/filtered_feature_bc_matrix.h5",
+            smp=["{smp}"],
+            fbsize=FMT_BIN_SIZE,
+        ),
     params:
         transcriptome=config["transcriptome"],  # Path of folder containing 10x-compatible reference
         probeset=config.get("probeset", ""),  # Path of probe set CSV.
         slidefiledir=config["slidefiledir"],  # Folder which holds the slide design files, downloaded from 10x Genomics.
         createbam=config.get("createbam", False),  # Enable or disable BAM file generation.
+        custbsize_cmd=CUSTOM_BIN_SIZE_CMD,  # Additional bin size alongside the standard ones (2, 8, 16).
         outdir=lambda wc: OUTDIR + "/" + wc.smp,  # Output the results to this directory
         execid=lambda wc: wc.smp,  # A unique run id and output folder name
         fastqdir=lambda wc: TASKPARAMS[wc.smp]["FastqDir"],  # Path to input FASTQ data
@@ -48,5 +64,6 @@ rule spaceranger_count:
             --slide "{params.slide}" \
             --slidefile "{params.slidefiledir}{params.slide}.vlf" \
             --area "{params.area}" \
+            {params.custbsize_cmd}
             > {log} 2>&1
         """
