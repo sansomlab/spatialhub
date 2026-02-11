@@ -1,0 +1,30 @@
+resources:
+    threads: 1
+    mem_mb: 32000
+    time: "01:00:00"
+
+# Input data
+spaceranger_dir: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/hh_ail10r/results/visium/spaceranger401-2024A
+fullres_image_dir: /users/sansom/vlw740/archive/IBD_Mouse_VisiumHD/images/full_resolution_images
+samples: ["Ss00", "Tx04", "Tx07", "Tx21"]
+
+# Output directory for segmentation results
+output_dir: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/hh_ail10r/results/visium/segment-level/segmentation.dir
+
+preprocessing:
+    quantile: 0.99 # Quantile for destriping gene expression data
+    min_bins: 3
+    min_counts: 1
+    mpp_values: [0.5, 0.4, 0.3, 0.2, 0.1]
+
+# Stardist segementation on H&E images
+segment_he:
+    mpp: 0.3
+    prob_thresh_values: NULL # Stardist probability threshold
+    nms_thresh_values: NULL # Stardist non-maximum suppression threshold
+
+# Stardist segmentation on gene expression
+segment_gex:
+    mpp: 0.3
+    prob_thresh_values: NULL # Stardist probability threshold
+    nms_thresh_values: NULL # Stardist non-maximum suppression threshold
