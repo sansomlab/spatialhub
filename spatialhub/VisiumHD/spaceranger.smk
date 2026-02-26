@@ -58,7 +58,7 @@ rule spaceranger_count:
         transcriptome=config["spaceranger"]["transcriptome"],  # Path of folder containing 10x-compatible reference
         probeset_cmd=probeset_cmd,  # Path of probe set CSV.
         slidefiledir=config["spaceranger"]["slidefiledir"],  # Folder which holds the slide design files, downloaded from 10x Genomics.
-        createbam=config.get("createbam", False),  # Enable or disable BAM file generation.
+        createbam=str(config.get("createbam", False)).lower(),  # Enable or disable BAM file generation.
         custbsize_cmd=custbsize_cmd,  # Additional bin size alongside the standard ones (2, 8, 16).
         cap="{cap}",  # A unique capture id and output folder name
         fastqdir=lambda wc: taskdict[wc.cap]["FastqDir"],  # Path to input FASTQ data
