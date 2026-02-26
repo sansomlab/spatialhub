@@ -95,7 +95,7 @@ rule make_zarr:
     input:
         rules.spaceranger_count.output,
     output:
-        os.path.join(config["outdir"], "zarr.dir", "{cap}.zarr"),
+        directory(os.path.join(config["outdir"], "zarr.dir", "{cap}.zarr")),
     log:
         os.path.join(config["outdir"], "zarr.dir", "mkzarr-{cap}.log"),
     params:
@@ -120,7 +120,7 @@ rule make_zarr:
                     )
 
                     sdata = spdio.visium_hd(
-                        path=os.path.dirname(input[0]),
+                        path=os.path.join(os.path.dirname(input[0]), "outs"),
                         dataset_id=params.cap,
                         filtered_counts_file=params.use_filtered,
                         load_segmentations_only=False,
