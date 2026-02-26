@@ -1,0 +1,29 @@
+resources:
+    threads: 8
+    mem_mb: 32000
+    time: "12:00:00"
+
+# output directory
+fullres_image_dir: /users/sansom/vlw740/archive/IBD_Mouse_VisiumHD/images/full_resolution_images
+outdir: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/hh_ail10r/results/visium/
+
+# SpaceRanger parameters
+spaceranger:
+    # csv file indicating tasks to run and paths to inputs
+    tasktab: /users/sansom/vlw740/devel/IBD_Mouse_TimeCourse/spatial/VisiumHD/metadata/metadata.csv
+
+    # custom bin size
+    custom_bin_size: NULL
+
+    # reference transcriptome
+    transcriptome: "/well/kir/mirror/genomes/10x/refdata-gex-GRCm39-2024-A"
+
+    # slide file folder
+    slidefiledir: "/users/sansom/vlw740/archive/IBD_Mouse_VisiumHD/data"
+
+    # probe set
+    probeset: NULL
+
+# SpatialData-io parameters
+make_zarr:
+    use_filtered: True
