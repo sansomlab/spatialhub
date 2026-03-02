@@ -53,7 +53,7 @@ rule spaceranger_count:
     output:
         os.path.join(config["outdir"], "spaceranger.dir", "{cap}/spaceranger.sentinel"),
     log:
-        os.path.join(config["outdir"], "spaceranger.dir", "{cap}/spaceranger-{cap}.log"),
+        os.path.join(config["outdir"], "spaceranger.dir", "spaceranger-{cap}.log"),
     params:
         transcriptome=config["spaceranger"]["transcriptome"],  # Path of folder containing 10x-compatible reference
         probeset_cmd=probeset_cmd,  # Path of probe set CSV.
@@ -72,12 +72,13 @@ rule spaceranger_count:
         """
         outdir=$(dirname "{output[0]}")
 
+        rmdir "$outdir"
         spaceranger count \
             --id "{params.cap}" \
             --transcriptome "{params.transcriptome}" \
             {params.probeset_cmd} \
             --create-bam "{params.createbam}" \
-            --output-dir "$outdir/{params.cap}" \
+            --output-dir "$outdir" \
             --fastqs "{params.fastqdir}" \
             --cytaimage "{params.cytaimage}" \
             {params.image_cmd} \

@@ -1,11 +1,12 @@
 resources:
     threads: 8
-    mem_mb: 32000
-    time: "12:00:00"
+    mem_mb: 64000
+    time: "50:00:00"
+    slurm_partition: long
 
 # output directory
 fullres_image_dir: /users/sansom/vlw740/archive/IBD_Mouse_VisiumHD/images/full_resolution_images
-outdir: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/hh_ail10r/results/visium/
+outdir: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/hh_ail10r/results/visium_hd
 
 # SpaceRanger parameters
 spaceranger:
