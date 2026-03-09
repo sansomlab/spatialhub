@@ -1,5 +1,5 @@
 resources:
-    threads: 8
+    threads: 16
     mem_mb: 64000
     time: "50:00:00"
     slurm_partition: long
@@ -17,13 +17,16 @@ spaceranger:
     custom_bin_size: NULL
 
     # reference transcriptome
-    transcriptome: "/well/kir/mirror/genomes/10x/refdata-gex-GRCm39-2024-A"
+    transcriptome: /well/kir/mirror/genomes/10x/refdata-gex-GRCm39-2024-A
 
     # slide file folder
-    slidefiledir: "/users/sansom/vlw740/archive/IBD_Mouse_VisiumHD/data"
+    slidefiledir: /users/sansom/vlw740/archive/IBD_Mouse_VisiumHD/data
 
     # probe set
-    probeset: NULL
+    probeset: /users/sansom/vlw740/archive/IBD_Mouse_VisiumHD/data/Visium_Mouse_Transcriptome_Probe_Set_v2.1.0_GRCm39-2024-A.csv
+
+    # create bam
+    createbam: True
 
 # SpatialData-io parameters
 make_zarr:
