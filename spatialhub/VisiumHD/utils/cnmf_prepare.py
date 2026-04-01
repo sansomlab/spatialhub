@@ -15,13 +15,14 @@ if __name__ == "__main__":
     args.add_argument("--outdir", required=True, help="Path to the output directory.")
     args.add_argument(
         "--min_nsquares",
+        type=int,
         default=100,
         help="Minimum number of squares expressing a gene.",
     )
     args.add_argument(
-        "--hvgs",
+        "--genes",
         default=None,
-        help="Path to the HVG table. By default, genes passing min_ncell filtration are used.",
+        help="Path to a text file containing genes to use (one gene per line).",
     )
     args.add_argument(
         "--k_list",
@@ -43,13 +44,15 @@ if __name__ == "__main__":
         raise FileExistsError(f"Temp folder {outpath} already exists.")
 
     adata = sc.read_h5ad(args.anndata)
-    print("Original adata:\n", adata)
+    print("Original adata:\n", adata, "\n")
+
     sc.pp.filter_genes(adata, min_cells=args.min_nsquares)
-    print(f"Filtered anndata (min_cells={args.min_nsquares}):\n", adata)
-    if args.hvgs is not None:
-        hvgs = pd.read_csv(args.hvgs, index_col=0)
-        adata = adata[:, adata.var_names.isin(hvgs.index)].copy()
-        print("Anndata with HVGs:\n", adata)
+    print(f"Filtered anndata (min_cells={args.min_nsquares}):\n", adata, "\n")
+
+    if args.genes is not None:
+        genes = pd.read_csv(args.genes, header=None, index_col=0)
+        adata = adata[:, adata.var_names.isin(genes.index)].copy()
+        print("Anndata with selected genes:\n", adata)
 
     if args.X_corr is not None:
         print("Loading X_corr from", args.X_corr)

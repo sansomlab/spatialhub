@@ -31,6 +31,12 @@ if __name__ == "__main__":
         help="RCTD mode: 'doublet', 'multi', or 'full'.",
     )
     parser.add_argument(
+        "--xcoord", default="x", help="Column name for x coordinates in query data."
+    )
+    parser.add_argument(
+        "--ycoord", default="y", help="Column name for y coordinates in query data."
+    )
+    parser.add_argument(
         "--outdir", type=str, required=True, help="Path to save the RCTD results."
     )
     args = parser.parse_args()
@@ -42,12 +48,30 @@ if __name__ == "__main__":
             f"Output file {opath} already exists. Please rerun with a different path."
         )
 
-    # Prepare data for RCTD
-    ref = rctd.Reference(sc.read_h5ad(args.reference), cell_type_col=args.celltype)
+    # Load reference data
+    rdata = sc.read_h5ad(args.reference)
+    print(rdata, "\n", rdata.X[rdata.X > 5], "\n")
+
+    # Load query data
+    qdata = sc.read_h5ad(args.query)
+    if "counts" in qdata.layers:
+        qdata.X = qdata.layers["counts"].copy()
+    if args.xcoord != "x":
+        print(f"Copying {args.xcoord} column to 'x' for RCTD compatibility.")
+        qdata.obs["x"] = qdata.obs[args.xcoord].values
+    if args.ycoord != "y":
+        print(f"Copying {args.ycoord} column to 'y' for RCTD compatibility.")
+        qdata.obs["y"] = qdata.obs[args.ycoord].values
+    print(qdata, "\n", qdata.X[qdata.X > 5], "\n")
+
+    # Create RCTD reference
+    ref = rctd.Reference(rdata, cell_type_col=args.celltype)
+    print(f"Reference profiles: {ref.profiles.shape}")
+    print(f"Cell types: {ref.cell_type_names}")
 
     # Run RCTD
-    cfg = rctd.RCTDConfig(UMI_min=1, UMI_min_sigma=1)
-    result = rctd.run_rctd(sc.read_h5ad(args.query), ref, mode=args.mode, config=cfg)
+    cfg = rctd.RCTDConfig()
+    result = rctd.run_rctd(qdata, ref, mode=args.mode, config=cfg)
 
     # Save results
     with open(opath, "wb") as f:

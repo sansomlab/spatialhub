@@ -1,6 +1,12 @@
 import os
 
-RESOURCES = {"threads": 1, "mem_mb": 4000, "time": "00:30:00", "ncpus": 1}
+RESOURCES = {
+    "threads": 1,
+    "mem_mb": 4000,
+    "time": "00:30:00",
+    "ncpus": 1,
+    "partition": "short",
+}
 RESOURCES.update(config.get("resources", {}))
 
 UTILS_DIR = os.path.join(workflow.basedir, "utils")
@@ -84,15 +90,15 @@ rule cnmf_prepare:
         outdir=os.path.join(config["outdir"], "{tname}"),
         k_list=" ".join([str(k) for k in config["nfact_list"]]),
         min_nsquares=lambda wc: config["tasks"][wc.tname]["min_nsquares"],
-        hvgs=lambda wc: config["tasks"][wc.tname].get("hvgs", None),
+        genes=lambda wc: config["tasks"][wc.tname].get("genes", None),
         n_iters=lambda wc: config["cnmf_niters"],
         X_corr=config.get("X_corr", None),
     shell:
         """
-        if [ "{params.hvgs}" != "None" ]; then
-            params_hvgs="--hvgs {params.hvgs}"
+        if [ "{params.genes}" != "None" ]; then
+            params_genes="--genes {params.genes}"
         else
-            params_hvgs=""
+            params_genes=""
         fi
 
         if [ "{params.X_corr}" != "None" ]; then
@@ -104,7 +110,7 @@ rule cnmf_prepare:
         python {UTILS_DIR}/cnmf_prepare.py \
             --anndata {input.anndata} \
             --min_nsquares {params.min_nsquares} \
-            $params_hvgs \
+            $params_genes \
             --outdir {params.outdir} \
             --k_list {params.k_list} \
             --n_iters {params.n_iters} \
