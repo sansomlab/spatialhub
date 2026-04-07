@@ -173,6 +173,6 @@ rule cnmf_combine:
     run:
         import cnmf
 
-        cnmf_obj = cnmf.cNMF(outdir=params.outdir, name="cnmf")
+        cnmf_obj = cnmf.cNMF(output_dir=params.outdir, name="cnmf")
         cnmf_obj.combine()
         cnmf_obj.k_selection_plot()

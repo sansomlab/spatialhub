@@ -1,0 +1,58 @@
+resources:
+    threads: 2
+    mem_mb: 64000
+    time: "4:00:00"
+    partition: "short"
+
+outdir: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/hh_ail10r/results/visium_hd/rctd.dir/
+mode: multi
+
+tasks:
+    LineageHiRes_fromCtrl:
+        reference: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/atlas/harmonised/mayassi2024_replacedCtrl.h5ad
+        query: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/hh_ail10r/results/visium_hd/anndata.dir/merged.square_008um.h5ad
+        celltype: Lineage_HiRes
+        umi_min: 20
+        umi_min_sigma: 60
+        xcoord: array_col
+        ycoord: array_row
+    LineageHiRes_fromTx04:
+        reference: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/atlas/harmonised/mayassi2024_replacedTx04.h5ad
+        query: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/hh_ail10r/results/visium_hd/anndata.dir/merged.square_008um.h5ad
+        celltype: Lineage_HiRes
+        umi_min: 20
+        umi_min_sigma: 60
+        xcoord: array_col
+        ycoord: array_row
+    LineageHiRes_fromTx14:
+        reference: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/atlas/harmonised/mayassi2024_replacedTx14.h5ad
+        query: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/hh_ail10r/results/visium_hd/anndata.dir/merged.square_008um.h5ad
+        celltype: Lineage_HiRes
+        umi_min: 20
+        umi_min_sigma: 60
+        xcoord: array_col
+        ycoord: array_row
+    OriginalAnnot_fromCtrl:
+        reference: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/atlas/harmonised/mayassi2024_replacedCtrl.h5ad
+        query: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/hh_ail10r/results/visium_hd/anndata.dir/merged.square_008um.h5ad
+        celltype: original_annot
+        umi_min: 20
+        umi_min_sigma: 60
+        xcoord: array_col
+        ycoord: array_row
+    OriginalAnnot_fromTx04:
+        reference: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/atlas/harmonised/mayassi2024_replacedTx04.h5ad
+        query: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/hh_ail10r/results/visium_hd/anndata.dir/merged.square_008um.h5ad
+        celltype: original_annot
+        umi_min: 20
+        umi_min_sigma: 60
+        xcoord: array_col
+        ycoord: array_row
+    OriginalAnnot_fromTx14:
+        reference: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/atlas/harmonised/mayassi2024_replacedTx14.h5ad
+        query: /users/sansom/vlw740/work/IBD_Mouse_TimeCourse/hh_ail10r/results/visium_hd/anndata.dir/merged.square_008um.h5ad
+        celltype: original_annot
+        umi_min: 20
+        umi_min_sigma: 60
+        xcoord: array_col
+        ycoord: array_row

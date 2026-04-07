@@ -14,21 +14,19 @@ if __name__ == "__main__":
         help="Path to the reference single-cell data (h5ad file).",
     )
     parser.add_argument(
-        "--celltype",
-        required=True,
-        help="Column in reference data for cell types.",
-    )
-    parser.add_argument(
         "--query",
         type=str,
         required=True,
         help="Path to the spatial data for query (h5ad file).",
     )
     parser.add_argument(
-        "--mode",
-        type=str,
-        default="multi",
-        help="RCTD mode: 'doublet', 'multi', or 'full'.",
+        "--celltype", required=True, help="Column in reference data for cell types."
+    )
+    parser.add_argument(
+        "--outpath", type=str, required=True, help="Path to save the RCTD results."
+    )
+    parser.add_argument(
+        "--mode", default="multi", help="RCTD mode: 'doublet', 'multi', or 'full'."
     )
     parser.add_argument(
         "--xcoord", default="x", help="Column name for x coordinates in query data."
@@ -37,16 +35,27 @@ if __name__ == "__main__":
         "--ycoord", default="y", help="Column name for y coordinates in query data."
     )
     parser.add_argument(
-        "--outdir", type=str, required=True, help="Path to save the RCTD results."
+        "--umi_min", type=int, default=100, help="Minimum UMI count per pixel."
+    )
+    parser.add_argument(
+        "--umi_min_sigma",
+        type=int,
+        default=300,
+        help="Minimum UMI for sigma estimation.",
     )
     args = parser.parse_args()
 
     celltype_clean = re.sub(r"[^A-Za-z0-9_-]", "", args.celltype)
-    opath = os.path.join(args.outdir, f"rctd_result.{args.mode}.{celltype_clean}.pkl")
-    if os.path.exists(opath):
+    if not args.outpath.endswith(".pkl"):
+        raise ValueError("Output path must end with '.pkl'")
+    if os.path.exists(args.outpath):
         raise FileExistsError(
-            f"Output file {opath} already exists. Please rerun with a different path."
+            f"Output file {args.outpath} already exists. Please rerun with a different path."
         )
+
+    print("Arguments:")
+    for arg in vars(args):
+        print(f"\t- {arg}: {getattr(args, arg)}")
 
     # Load reference data
     rdata = sc.read_h5ad(args.reference)
@@ -70,9 +79,9 @@ if __name__ == "__main__":
     print(f"Cell types: {ref.cell_type_names}")
 
     # Run RCTD
-    cfg = rctd.RCTDConfig()
+    cfg = rctd.RCTDConfig(UMI_min=args.umi_min, UMI_min_sigma=args.umi_min_sigma)
     result = rctd.run_rctd(qdata, ref, mode=args.mode, config=cfg)
 
     # Save results
-    with open(opath, "wb") as f:
+    with open(args.outpath, "wb") as f:
         pickle.dump(result, f)
