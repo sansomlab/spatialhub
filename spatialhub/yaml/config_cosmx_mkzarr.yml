@@ -1,0 +1,16 @@
+resources:
+    mem_mb: 64000
+    time: 02:00:00
+
+out_dir: /path/to/output/zarr.dir
+meta_tsv: /path/to/metadata.tsv # must be a tab-delimited file with columns: sample_id, slide_id, fov_sequence
+ctrl_probe_regex: "Negative|System|Blank"
+channel_lst: "DAPI,CD298/B2M,PanCK,CD45,-"
+fov_width_px: 4256
+fov_height_px: 4256
+slide_dict:
+    slide1:
+        flat_pfx1: /prefix/of/the/path/to/slide1/flatFiles/before/_or-
+        morph_pfx1: /prefix/of/the/path/to/slide1/Morphology2D/images/before/the/5-digit/fov/numbers
+include_polygon: true
+scale_factors: 4,4
