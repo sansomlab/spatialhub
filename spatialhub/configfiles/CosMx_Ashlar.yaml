@@ -1,0 +1,19 @@
+resources:
+    threads: 4
+    mem_mb: 64000
+    time: "4:00:00"
+    partition: "short"
+
+outdir: /path/to/ashlar.dir/
+
+ashlar:
+    align_channel: NULL
+    flip_x: false
+    flip_y: false
+    flip_mosaic_x: false
+    flip_mosaic_y: false
+    output_channels: NULL
+    max_micron_shift: 1
+    filter_sigma: 0
+    pyramid: true
+    tile_size: 4256

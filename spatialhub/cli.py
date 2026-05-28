@@ -1,8 +1,13 @@
 import argparse
 import subprocess
 
+from importlib.resources import files
 from pathlib import Path
 from spatialhub import __version__
+
+RED = "\033[91m"
+GREEN = "\033[92m"
+RESET = "\033[0m"
 
 
 def welcome_message():
@@ -16,6 +21,34 @@ def welcome_message():
     print()
 
 
+def copy_config_file(module):
+    yaml_dir = Path(__file__).parent.joinpath("configfiles")
+    src = yaml_dir.joinpath(f"{module}.yaml")
+    dst = Path.cwd().joinpath(f"{module}.yaml")
+    if not dst.exists():
+        dst.write_text(src.read_text())
+        print(f"[INFO] Copied {module} config file to the current directory.")
+    else:
+        print(f"{RED}[ERROR] {module} configfile already exists.{RESET}")
+        raise FileExistsError()
+
+
+def run_snakemake(smkpath, task, cores, jobs, dry_run):
+    cmd = ["snakemake", "--snakefile", smkpath, "--cores", cores, "--jobs", jobs, "-p"]
+    cmd.extend(["--executor", "drmaa"])
+    drmaa_args = (
+        " -p {resources.partition} --mem={resources.mem_mb} --cpus-per-task={threads} "
+        + "--time={resources.time} --output=logs/job_%j.out --error=logs/job_%j.err"
+    )
+    log_dir = "logs"
+    cmd.extend(["--drmaa-args", drmaa_args, "--drmaa-log-dir", log_dir])
+    if dry_run:
+        cmd.append("--dry-run")
+    cmd.extend([task])
+    print("Running command:", " ".join(cmd))
+    subprocess.run(cmd, check=True)
+
+
 def main():
     welcome_message()
 
@@ -26,9 +59,6 @@ def main():
     parser.add_argument("module", help="The module to run.")
     parser.add_argument("task", help="The task to run, [config|full|<rulename>].")
     parser.add_argument("--dry", action="store_true", help="Perform a dry run only.")
-    parser.add_argument(
-        "--scheduler", default="drmaa", help="The scheduler to use, [drmaa|slurm]."
-    )
     parser.add_argument(
         "--cores", default="all", help="Number of cores to use for Snakemake."
     )
@@ -41,36 +71,11 @@ def main():
     args = parser.parse_args()
 
     # Determine the path to the Snakefile
-    snakefile_path = Path(__file__).parent.parent / "workflow" / "Snakefile"
+    smkpath = files("spatialhub").joinpath("snakefiles", f"{args.module}.smk")
 
-    # Build the Snakemake command
-    cmd = [
-        "snakemake",
-        "--snakefile",
-        str(snakefile_path),
-        "--config",
-        f"module={args.module}",
-        f"task={args.task}",
-        "--cores",
-        str(args.cores),
-        "--jobs",
-        str(args.jobs),
-    ]
-    if args.dry:
-        cmd.append("--dry-run")
-    elif args.scheduler == "drmaa":
-        cmd.extend(["--executor", "drmaa"])
-        drmaa_args = (
-            " -p {resources.partition} --mem={resources.mem_mb} --cpus-per-task={threads} "
-            + "--time={resources.time} --output=logs/job_%j.out --error=logs/job_%j.err"
-        )
-        log_dir = "logs"
-        cmd.extend(["--drmaa-args", drmaa_args, "--drmaa-log-dir", log_dir])
-    elif args.scheduler == "slurm":
-        cmd.extend(["--executor", "slurm"])
+    if args.task == "config":
+        copy_config_file(args.module)
     else:
-        raise ValueError(f"Unknown scheduler {args.scheduler}, use 'drmaa' or 'slurm'.")
+        run_snakemake(smkpath, args.task, str(args.cores), str(args.jobs), args.dry)
 
-    # Execute the command
-    print("Running command:", " ".join(cmd))
-    subprocess.run(cmd, check=True)
+    print(f"{GREEN}Completed successfully!{RESET}")
