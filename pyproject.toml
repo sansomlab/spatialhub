@@ -5,7 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "spatialhub"
 version = "0.1.0"
-dependencies = ["snakemake>=9", "snakemake-executor-plugin-drmaa", "ashlar"]
+dependencies = [
+    "snakemake>=9",
+    "snakemake-executor-plugin-drmaa",
+    "ashlar",
+    "anndata",
+    "scanpy",
+    "spatialdata",
+    "spatialdata-io",
+    "spatialdata-plot",
+]
 
 [project.scripts]
 spatialhub = "spatialhub.cli:main"

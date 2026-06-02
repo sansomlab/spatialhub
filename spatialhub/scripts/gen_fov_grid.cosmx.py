@@ -16,21 +16,20 @@ def parse_grid_smpgrp(fovpos_smp, width, height):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--fovpos-csv", required=True, help="CSV for FOV positions.")
-    parser.add_argument("--raw-meta", required=True, help="TSV for raw metadata.")
-    parser.add_argument("--outpath", required=True, help="Path for output TSV.")
-    parser.add_argument("--width", type=int, default=4256, help="FOV width.")
-    parser.add_argument("--height", type=int, default=4256, help="FOV height.")
-    parser.add_argument("--slide", help="If specified, only process this slide ID.")
-    args = parser.parse_args()
+    p = argparse.ArgumentParser()
+    p.add_argument("--fovpos-csv", required=True, help="CSV for FOV positions.")
+    p.add_argument("--raw-meta", required=True, help="TSV for raw metadata.")
+    p.add_argument("--slide", required=True, help="Only process this slide ID.")
+    p.add_argument("--width", type=int, default=4256, help="FOV width.")
+    p.add_argument("--height", type=int, default=4256, help="FOV height.")
+    p.add_argument("--tsv-out", default=None, help="Write to TSV; defaults to stdout.")
+    args = p.parse_args()
 
     meta = pd.read_csv(args.raw_meta, sep="\t")
     assert "sample_id" in meta.columns, "metadata needs a 'sample_id' column."
-    if args.slide is not None:
-        assert "slide_id" in meta.columns, "metadata needs a 'slide_id' column."
-        meta = meta.loc[meta["slide_id"] == args.slide].copy()
+    assert "slide_id" in meta.columns, "metadata needs a 'slide_id' column."
     assert "fov_sequence" in meta.columns, "metadata needs a 'fov_sequence' column."
+    meta = meta.loc[meta["slide_id"] == args.slide].copy()
     meta.set_index("sample_id", inplace=True)
 
     fovpos = pd.read_csv(args.fovpos_csv)
@@ -89,4 +88,8 @@ if __name__ == "__main__":
     meta["fov_sequence"] = meta.index.map(smp2fovseq)
     meta["fov_width"] = meta.index.map(smp2width)
     meta["fov_height"] = meta.index.map(smp2height)
-    meta.reset_index().to_csv(args.outpath, sep="\t", index=False)
+
+    if args.tsv_out is not None:
+        meta.reset_index().to_csv(args.tsv_out, sep="\t", index=False)
+    else:
+        print(meta.reset_index().to_csv(sep="\t", index=False))
