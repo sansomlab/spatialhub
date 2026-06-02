@@ -33,8 +33,9 @@ def copy_config_file(module):
         raise FileExistsError()
 
 
-def run_snakemake(smkpath, task, cores, jobs, dry_run):
+def run_snakemake(smkpath, task, cores, jobs, dry_run, lock):
     cmd = ["snakemake", "--snakefile", smkpath, "--cores", cores, "--jobs", jobs, "-p"]
+    cmd.extend(["--config", f"lock={lock}"])
     cmd.extend(["--executor", "drmaa"])
     drmaa_args = (
         " -p {resources.partition} --mem={resources.mem_mb} --cpus-per-task={threads} "
@@ -52,6 +53,8 @@ def run_snakemake(smkpath, task, cores, jobs, dry_run):
 def main():
     welcome_message()
 
+    vinfo = f"%(prog)s {__version__}"
+
     # Parse command-line arguments
     parser = argparse.ArgumentParser(
         description="An integrated platform for spatial transcriptomics analysis."
@@ -59,23 +62,28 @@ def main():
     parser.add_argument("module", help="The module to run.")
     parser.add_argument("task", help="The task to run, [config|full|<rulename>].")
     parser.add_argument("--dry", action="store_true", help="Perform a dry run only.")
-    parser.add_argument(
-        "--cores", default="all", help="Number of cores to use for Snakemake."
-    )
-    parser.add_argument(
-        "--jobs", default="1", help="Number of jobs to run in parallel for Snakemake."
-    )
-    parser.add_argument(
-        "--version", action="version", version=f"%(prog)s {__version__}"
-    )
+    parser.add_argument("--cores", default="all", help="Number of cores to use.")
+    parser.add_argument("--jobs", default="1", help="Number of parallel jobs to run.")
+    parser.add_argument("--lock", action="store_true", help="Lock output by chmod.")
+    parser.add_argument("-v", "--version", action="version", version=vinfo)
     args = parser.parse_args()
 
     # Determine the path to the Snakefile
     smkpath = files("spatialhub").joinpath("snakefiles", f"{args.module}.smk")
 
+    if args.lock and args.task == "config":
+        print(f"{GREEN}[INFO] `--lock` is ignored when running config task.{RESET}")
+
     if args.task == "config":
         copy_config_file(args.module)
     else:
-        run_snakemake(smkpath, args.task, str(args.cores), str(args.jobs), args.dry)
+        run_snakemake(
+            smkpath,
+            args.task,
+            str(args.cores),
+            str(args.jobs),
+            args.dry,
+            str(args.lock).lower(),
+        )
 
     print(f"{GREEN}Completed successfully!{RESET}")

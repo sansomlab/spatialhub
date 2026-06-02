@@ -4,6 +4,7 @@ resources:
     time: "4:00:00"
     partition: "short"
 
+sample_folder: /path/to/Morphology2D/folder/containing/fovs/grouped/by/sample/
 outdir: /path/to/ashlar.dir/
 
 ashlar:
