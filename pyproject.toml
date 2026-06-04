@@ -11,9 +11,14 @@ dependencies = [
     "ashlar",
     "anndata",
     "scanpy",
+    "harmonypy",
+    "scvi-tools",
     "spatialdata",
     "spatialdata-io",
     "spatialdata-plot",
+    "rctd-py",
+    "ipykernel",
+    "spin @ git+https://github.com/wanglab-broad/spin@main",
 ]
 
 [project.scripts]
