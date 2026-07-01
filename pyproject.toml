@@ -1,25 +1,30 @@
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "spatialhub"
 version = "0.1.0"
+description = "Pipelines for Spatial Transcriptomics Analysis."
+authors = [{ name = "Sansom Lab", email = "" }]
 dependencies = [
     "snakemake>=9",
     "snakemake-executor-plugin-drmaa",
     "ashlar",
     "anndata",
-    "scanpy",
+    "scanpy>=1.12.1",
     "harmonypy",
     "scvi-tools",
     "spatialdata",
     "spatialdata-io",
     "spatialdata-plot",
     "rctd-py",
-    "ipykernel",
     "spin @ git+https://github.com/wanglab-broad/spin@main",
+    "ipykernel",
 ]
+requires-python = ">=3.12"
+readme = "README.md"
+license = { text = "MIT" }
 
-[project.scripts]
-spatialhub = "spatialhub.cli:main"
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
