@@ -1,3 +1,21 @@
+#!/usr/bin/env python3
+
+"""
+Create a blank CosMx FOV TIFF image.
+
+This utility generates a blank FOV tile filled with zeros to serve as a
+placeholder for missing FOVs in a CosMx dataset.
+
+Supported data types:
+    - u8
+    - u16 (default)
+    - u32
+
+Examples:
+    create_mock_fov.py blank.tif
+    create_mock_fov.py blank.tif --width 2048 --height 2048 --dtype u8
+"""
+
 import os
 import numpy as np
 
