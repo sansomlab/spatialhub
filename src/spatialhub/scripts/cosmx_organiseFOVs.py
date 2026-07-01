@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 Organise CosMx FOVs into a symbolic-link-based structure.
 
