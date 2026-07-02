@@ -8,7 +8,7 @@ filling missing FOVs with a blank mock FOV tile.
 Outputs
 -------
 - A directory containing symbolic links to the FOV tiles.
-- A CSV file with the full grid of FOV positions.
+- A CSV file with the full grid of field positions.
 - A YAML file with the grid dimensions for downstream analysis.
 
 Example:
@@ -87,11 +87,11 @@ def main():
 
     # Read FOV positions and filter to requested FOVs
     fovpos = pd.read_csv(args.fov_csv)
-    if "FOV" in fovpos.columns:
-        fovpos.rename(columns={"FOV": "fov"}, inplace=True)
-    elif "fov" not in fovpos.columns:
+    if "fov" in fovpos.columns:
+        fovpos.rename(columns={"fov": "FOV"}, inplace=True)
+    if "FOV" not in fovpos.columns:
         raise ValueError("missing 'FOV' or 'fov' column in FOV table")
-    fovpos.set_index("fov", inplace=True)
+    fovpos.set_index("FOV", inplace=True)
 
     missing = {"x_global_px", "y_global_px"} - set(fovpos.columns)
     if missing:
@@ -109,41 +109,41 @@ def main():
     ## y, row, height
     fovpos["irow"] = ((ymax_px - fovpos["y_global_px"]) / height + 0.5).astype(int)
 
-    # Compute grid dimensions and update the FOV positions to include missing FOVs
+    # Compute grid dimensions and update the field positions to include missing fields
     ncols, nrows = int(fovpos["icol"].max() + 1), int(fovpos["irow"].max() + 1)
-    grid2fov = fovpos.reset_index().set_index(["icol", "irow"])["fov"].to_dict()
+    grid2fov = fovpos.reset_index().set_index(["icol", "irow"])["FOV"].to_dict()
     rows = []
-    for ifov, (irow, icol) in enumerate(product(range(nrows), range(ncols))):
+    for field, (irow, icol) in enumerate(product(range(nrows), range(ncols))):
         if (icol, irow) in grid2fov:
-            ifov_init = grid2fov[(icol, irow)]
-            x_px, y_px = fovpos.loc[ifov_init, ["x_global_px", "y_global_px"]].tolist()
-            src = f"{args.m2d_pfx}{ifov_init:05}.TIF"
+            fov = grid2fov[(icol, irow)]
+            x_px, y_px = fovpos.loc[fov, ["x_global_px", "y_global_px"]].tolist()
+            src = f"{args.m2d_pfx}{fov:05}.TIF"
         else:
-            ifov_init = pd.NA
+            fov = pd.NA
             src = args.mock_path
             x_px, y_px = xmin_px + icol * width, ymax_px - irow * height
-        dest = os.path.join(args.outdir, "FOVs", f"F{ifov:05}.TIF")
+        dest = os.path.join(args.outdir, "FOVs", f"F{field:05}.TIF")
         rows.append(
             {
-                "fov": ifov,
+                "Field": field,
                 "x_global_px": x_px,
                 "y_global_px": y_px,
                 "icol": icol,
                 "irow": irow,
-                "fov_orig": ifov_init,
+                "FOV": fov,
             }
         )
-        if not os.path.exists(src):
+        if not os.path.isfile(src):
             raise FileNotFoundError(f"source file '{src}' does not exist")
         os.symlink(src, dest)
-    fovpos2 = pd.DataFrame(rows)
-    fovpos2.to_csv(os.path.join(args.outdir, "fov_positions.fullgrid.csv"), index=False)
+    field_pos = pd.DataFrame(rows)
+    field_pos.to_csv(os.path.join(args.outdir, "full_grid_fields.csv"), index=False)
 
     # Create a YAML file with the grid dimensions for downstream analysis
-    with open(os.path.join(args.outdir, "fov_metadata.yaml"), "w") as f:
+    with open(os.path.join(args.outdir, "grid.yaml"), "w") as f:
         yaml.safe_dump({"ncols": ncols, "nrows": nrows}, f, sort_keys=False)
 
-    print(f"{GREEN}Created {fovpos2.shape[0]} FOV links in {args.outdir}.{RESET}")
+    print(f"{GREEN}Created {field_pos.shape[0]} field links in {args.outdir}.{RESET}")
 
 
 if __name__ == "__main__":
