@@ -1,18 +1,23 @@
 """
-Organise CosMx FOVs into a symbolic-link-based structure.
+Organise CosMx FOVs into a complete grid.
 
-This utility reads a CSV file containing FOV positions and creates 
-a symbolic-link-based directory structure for downstream analysis, 
-filling missing FOVs with a blank mock FOV tile.
+This utility reads a CSV file containing CosMx FOV positions and creates
+a symbolic-link-based directory structure for downstream analysis,
+filling missing FOVs with a blank mock FOV tile to form a complete grid.
 
 Outputs
 -------
 - A directory containing symbolic links to the FOV tiles.
-- A CSV file with the full grid of field positions.
-- A YAML file with the grid dimensions for downstream analysis.
+- A CSV file describing the complete grid of fields, with the following columns:
+    - grid_index: Index of the field in the complete grid (0-based).
+    - x_global_px: X-coordinate of the field in global pixel coordinates.
+    - y_global_px: Y-coordinate of the field in global pixel coordinates.
+    - col_index: Column index of the field in the grid (0-based).
+    - row_index: Row index of the field in the grid (0-based).
+    - FOV: Original CosMx FOV identifier, or `-1` for mock fields.
 
 Example:
-    cosmx_organiseFOVs.py outdir \
+    python cosmx_organiseFields.py outdir \
         --fov-csv fov_positions.csv \
         --fov-lst 1,2,5-7,10 \
         --m2d-pfx /path/to/morphology2D/FILENAMEPREFIX_F \
@@ -20,7 +25,6 @@ Example:
 """
 
 import os
-import yaml
 import pandas as pd
 
 from argparse import ArgumentParser as AP
@@ -65,8 +69,8 @@ def parse_fov_list(fov_lst: str):
 
 
 def main():
-    p = AP(description="Organise CosMx FOVs into a symbolic-link-based structure.")
-    p.add_argument("outdir", help="Output directory for the FOV symbolic links.")
+    p = AP(description="Organise CosMx FOVs into a complete grid.")
+    p.add_argument("outdir", help="Output directory for the field symbolic links.")
     p.add_argument("--fov-csv", required=True, help="CosMx FOV position file.")
     p.add_argument("--fov-lst", required=True, help="Comma-separated FOVs to include.")
     p.add_argument("--m2d-pfx", required=True, help="Prefix of Morphology2D paths.")
@@ -76,11 +80,11 @@ def main():
 
     if os.path.exists(args.outdir):
         raise FileExistsError(f"directory '{args.outdir}' already exists")
-    os.makedirs(os.path.join(args.outdir, "FOVs"), exist_ok=False)
+    os.makedirs(os.path.join(args.outdir, "field_links"), exist_ok=False)
 
     # Read mock FOV tile to get width and height
     height, width = imread(args.mock_path).shape
-    print(f"Parsed FOV tile dimensions: {width} x {height} pixels.")
+    print(f"Parsed grid dimensions: {width} x {height} pixels.")
 
     # Parse FOVs to include
     fovs = parse_fov_list(args.fov_lst)
@@ -113,23 +117,23 @@ def main():
     ncols, nrows = int(fovpos["icol"].max() + 1), int(fovpos["irow"].max() + 1)
     grid2fov = fovpos.reset_index().set_index(["icol", "irow"])["FOV"].to_dict()
     rows = []
-    for field, (irow, icol) in enumerate(product(range(nrows), range(ncols))):
+    for igrid, (irow, icol) in enumerate(product(range(nrows), range(ncols))):
         if (icol, irow) in grid2fov:
             fov = grid2fov[(icol, irow)]
             x_px, y_px = fovpos.loc[fov, ["x_global_px", "y_global_px"]].tolist()
             src = f"{args.m2d_pfx}{fov:05}.TIF"
         else:
-            fov = pd.NA
+            fov = -1
             src = args.mock_path
             x_px, y_px = xmin_px + icol * width, ymax_px - irow * height
-        dest = os.path.join(args.outdir, "FOVs", f"F{field:05}.TIF")
+        dest = os.path.join(args.outdir, "field_links", f"F{igrid:05}.TIF")
         rows.append(
             {
-                "Field": field,
+                "grid_index": igrid,
                 "x_global_px": x_px,
                 "y_global_px": y_px,
-                "icol": icol,
-                "irow": irow,
+                "col_index": icol,
+                "row_index": irow,
                 "FOV": fov,
             }
         )
@@ -137,11 +141,7 @@ def main():
             raise FileNotFoundError(f"source file '{src}' does not exist")
         os.symlink(src, dest)
     field_pos = pd.DataFrame(rows)
-    field_pos.to_csv(os.path.join(args.outdir, "full_grid_fields.csv"), index=False)
-
-    # Create a YAML file with the grid dimensions for downstream analysis
-    with open(os.path.join(args.outdir, "grid.yaml"), "w") as f:
-        yaml.safe_dump({"ncols": ncols, "nrows": nrows}, f, sort_keys=False)
+    field_pos.to_csv(os.path.join(args.outdir, "grid_positions.csv"), index=False)
 
     print(f"{GREEN}Created {field_pos.shape[0]} field links in {args.outdir}.{RESET}")
 
@@ -150,4 +150,4 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        die("Failed to organise FOVs.")
+        die("Failed to organise fields.")
