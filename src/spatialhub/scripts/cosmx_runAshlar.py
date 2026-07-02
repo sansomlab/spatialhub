@@ -61,7 +61,7 @@ def main():
         raise FileNotFoundError(f"field directory '{args.field_dir}' does not exist")
 
     # Parse channels to write
-    ch_lst = args.ch_out.split(",") if args.ch_out is not None else None
+    ch_lst = list(map(int, args.ch_out.split(","))) if args.ch_out is not None else None
 
     # Determine grid dimensions
     ncols, nrows = gridpos["col_index"].max() + 1, gridpos["row_index"].max() + 1
