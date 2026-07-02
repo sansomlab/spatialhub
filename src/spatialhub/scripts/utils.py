@@ -8,6 +8,7 @@ YELLOW = "\033[93m"
 
 
 def die(msg: str, code: int = 1):
+    assert code != 0, "Exit code must be non-zero for die()"
     traceback.print_exc()
     print(f"{RED}{msg}{RESET}")
     sys.exit(code)
