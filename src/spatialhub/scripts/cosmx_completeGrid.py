@@ -1,5 +1,5 @@
 """
-Organise CosMx FOVs into a complete grid.
+Complete the CosMx field grid with symbolic links to FOV tiles and mock FOVs.
 
 This utility reads a CSV file containing CosMx FOV positions and creates
 a symbolic-link-based directory structure for downstream analysis,
@@ -15,13 +15,6 @@ Outputs
     - col_index: Column index of the field in the grid (0-based).
     - row_index: Row index of the field in the grid (0-based).
     - FOV: Original CosMx FOV identifier, or `-1` for mock fields.
-
-Example:
-    python cosmx_organiseFields.py outdir \
-        --fov-csv fov_positions.csv \
-        --fov-lst 1,2,5-7,10 \
-        --m2d-pfx /path/to/morphology2D/FILENAMEPREFIX_F \
-        --mock-path /path/to/mock/fov/blank.tiff
 """
 
 import os
@@ -30,42 +23,7 @@ import pandas as pd
 from argparse import ArgumentParser as AP
 from tifffile import imread
 from itertools import product
-from spatialhub.scripts.utils import print_arguments, RESET, GREEN, die
-
-
-def parse_fov_list(fov_lst: str):
-    """
-    Parse a comma-separated list of FOVs and ranges.
-
-    Args:
-        fov_lst: Comma-separated list of FOVs and ranges (e.g. "1,2,5-7,10").
-
-    Returns:
-        list[int]: Parsed FOV identifiers.
-
-    Raises:
-        ValueError: If the input contains malformed ranges or invalid FOV identifiers.
-    """
-    fovs = []
-    for fov_str in fov_lst.split(","):
-        fov_str = fov_str.strip()
-        if not fov_str:
-            continue
-
-        if "-" in fov_str:
-            try:
-                start, end = map(int, fov_str.split("-"))
-            except ValueError:
-                raise ValueError(f"invalid FOV range '{fov_str}'")
-            if start > end:
-                raise ValueError(f"invalid FOV range '{fov_str}': start > end")
-            fovs.extend(range(start, end + 1))
-        else:
-            try:
-                fovs.append(int(fov_str))
-            except ValueError:
-                raise ValueError(f"invalid FOV '{fov_str}'")
-    return fovs
+from spatialhub.scripts.utils import print_arguments, RESET, GREEN, die, parse_fov_list
 
 
 def main():
@@ -83,7 +41,7 @@ def main():
     os.makedirs(os.path.join(args.outdir, "field_links"), exist_ok=False)
 
     # Read mock FOV tile to get width and height
-    height, width = imread(args.mock_path).shape
+    _, height, width = imread(args.mock_path).shape
     print(f"Parsed grid dimensions: {width} x {height} pixels.")
 
     # Parse FOVs to include

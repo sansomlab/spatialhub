@@ -8,10 +8,6 @@ Supported data types:
     - u8
     - u16 (default)
     - u32
-
-Examples:
-    create_mock_fov.py blank.tif
-    create_mock_fov.py blank.tif --width 2048 --height 2048 --dtype u8
 """
 
 import os
@@ -30,6 +26,7 @@ def main():
     p.add_argument("output", help="Output path for the mock FOV tile.")
     p.add_argument("--width", type=int, default=S, help=f"FOV width in pixels [{S}].")
     p.add_argument("--height", type=int, default=S, help=f"FOV height in pixels [{S}].")
+    p.add_argument("--n-channels", type=int, default=1, help="Number of channels [1].")
     p.add_argument("--dtype", default="u16", help="FOV data type [u16 | u8 | u32].")
     args = p.parse_args()
     print_arguments(args)
@@ -46,7 +43,7 @@ def main():
         f"with dimensions ({args.width}, {args.height}) and dtype np.{args.dtype.replace('u', 'uint')}.",
     )
 
-    blank = np.zeros((args.height, args.width), dtype=fov_dtype)
+    blank = np.zeros((args.n_channels, args.height, args.width), dtype=fov_dtype)
     imwrite(args.output, blank)
     print(f"{GREEN}Blank FOV tile created.{RESET}")
 

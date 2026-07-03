@@ -27,15 +27,20 @@ def main():
     p.add_argument("--name-pattern", required=True, help="Pattern for FOV filenames.")
     p.add_argument("--px-size", type=float, default=0.120280945, help="Pixel size.")
     p.add_argument("--overlap", type=float, default=0.01, help="FOV overlap fraction.")
+    p.add_argument("--max-shift", type=int, default=15, help="Maximum shift (µm).")
     p.add_argument("--ch-align", type=int, default=0, help="Channel for alignment.")
     p.add_argument("--ch-out", default=None, help="Comma-separated channels to output.")
     args = p.parse_args()
     print_arguments(args)
 
-    out_csv = f"{args.out_pfx}_stitched.positions.csv"
-    out_tiff = f"{args.out_pfx}_stitched.ome.tiff"
+    out_csv = f"{args.out_pfx}stitched.positions.csv"
+    out_tiff = f"{args.out_pfx}stitched.ome.tiff"
     if os.path.exists(out_csv) or os.path.exists(out_tiff):
         raise FileExistsError(f"Output file '{out_csv}' or '{out_tiff}' already exists")
+    out_dir = os.path.dirname(out_tiff)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    print(f"Output files will be written to '{out_csv}' and '{out_tiff}'.")
 
     if not os.path.exists(args.gridpos_csv):
         raise FileNotFoundError(f"Grid position file '{args.gridpos_csv}' not found")
@@ -82,7 +87,7 @@ def main():
         raise ValueError(f"field number mismatch: {nfiles} files but {ngrids} rows")
 
     # Align the field tiles using EdgeAligner
-    aligner = EdgeAligner(reader, channel=args.ch_align)
+    aligner = EdgeAligner(reader, channel=args.ch_align, max_shift=args.max_shift)
     aligner.run()
 
     # Write out the stitched mosaic to an OME-TIFF file
@@ -98,7 +103,11 @@ def main():
         index=pd.Series([s for _, s in reader.metadata.all_series], name="grid_index"),
     ).round(5)
     coords_df["FOV"] = coords_df.index.map(grid2fov)
-    coords_df.to_csv(out_csv, index_label="grid_index")
+    coords_df = coords_df.loc[
+        coords_df["FOV"] >= 0,
+        ["FOV", "Position_X", "Position_Y", "Shift_X", "Shift_Y"],
+    ]
+    coords_df.set_index("FOV").to_csv(out_csv)
     print(f"Wrote output to '{out_csv}'.")
 
     print(f"{GREEN}Ashlar completed successfully.{RESET}")
