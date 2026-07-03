@@ -109,13 +109,15 @@ def main():
     )
     coords_df = coords_df.loc[coords_df["FOV"] >= 0].copy()  # Exclude mock FOVs
     coords_df = coords_df[
-        "FOV",
-        "Position_X",
-        "Position_Y",
-        "Shift_X",
-        "Shift_Y",
-        "x_global_px",
-        "y_global_px",
+        [
+            "FOV",
+            "Position_X",
+            "Position_Y",
+            "Shift_X",
+            "Shift_Y",
+            "x_global_px",
+            "y_global_px",
+        ]
     ]
     coords_df.set_index("FOV").to_csv(out_csv)
     print(f"Wrote output to '{out_csv}'.")
