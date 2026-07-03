@@ -32,7 +32,7 @@ def main():
     print_arguments(args)
 
     if os.path.exists(args.output):
-        raise FileExistsError(f"file '{args.output}' already exists")
+        raise FileExistsError(f"output file '{args.output}' already exists")
 
     try:
         fov_dtype = DTYPE_MAP[args.dtype]

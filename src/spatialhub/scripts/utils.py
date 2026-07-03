@@ -1,6 +1,8 @@
 import sys
 import traceback
 
+from spatialdata import bounding_box_query
+
 RESET = "\033[0m"
 RED = "\033[91m"
 GREEN = "\033[92m"
@@ -57,3 +59,28 @@ def parse_fov_list(fov_lst: str):
             except ValueError:
                 raise ValueError(f"invalid FOV '{fov_str}'")
     return fovs
+
+
+def crop_sdata(sdata, axes, x_minmax, y_minmax, coords="global"):
+    """
+    Crop a SpatialData object to a specified bounding box.
+
+    Args
+    ------
+        sdata: SpatialData object to crop.
+        axes: List of axes to consider.
+        x_minmax: List containing the minimum and maximum x coordinates of the bounding box.
+        y_minmax: List containing the minimum and maximum y coordinates of the bounding box.
+        coords: Coordinate system for the bounding box.
+
+    Returns
+    -------
+        SpatialData: Cropped SpatialData object.
+    """
+    return bounding_box_query(
+        sdata,
+        axes=axes,
+        min_coordinate=[x_minmax[0], y_minmax[0]],
+        max_coordinate=[x_minmax[1], y_minmax[1]],
+        target_coordinate_system=coords,
+    )

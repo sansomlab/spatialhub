@@ -38,7 +38,7 @@ def main():
     out_tiff = os.path.join(args.outdir, "assembled.ome.tiff")
     out_csv = os.path.join(args.outdir, "assembled.positions.csv")
     if os.path.exists(out_tiff) or os.path.exists(out_csv):
-        raise FileExistsError(f"Output file '{out_csv}' or '{out_tiff}' already exists")
+        raise FileExistsError(f"output file '{out_csv}' or '{out_tiff}' already exists")
     os.makedirs(args.outdir, exist_ok=True)
     print(f"Output files will be written to '{out_csv}' and '{out_tiff}'.")
 
@@ -99,7 +99,15 @@ def main():
         x_end = x_start + fov_width
         y_end = y_start + fov_height
         canvas[:, y_start:y_end, x_start:x_end] = tile[ch_lst, :, :]
-        rows.append({"FOV": fov, "X_Position": x_start, "Y_Position": y_start})
+        rows.append(
+            {
+                "FOV": fov,
+                "Position_X": x_start,
+                "Position_Y": y_start,
+                "x_global_px": x,
+                "y_global_px": y,
+            }
+        )
     tifffile.imwrite(out_tiff, canvas, ome=True, metadata={"axes": "CYX"})
     pd.DataFrame(rows).to_csv(out_csv, index=False)
 

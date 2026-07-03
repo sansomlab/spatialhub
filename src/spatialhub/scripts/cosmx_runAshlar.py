@@ -36,7 +36,7 @@ def main():
     out_csv = f"{args.out_pfx}stitched.positions.csv"
     out_tiff = f"{args.out_pfx}stitched.ome.tiff"
     if os.path.exists(out_csv) or os.path.exists(out_tiff):
-        raise FileExistsError(f"Output file '{out_csv}' or '{out_tiff}' already exists")
+        raise FileExistsError(f"output file '{out_csv}' or '{out_tiff}' already exists")
     out_dir = os.path.dirname(out_tiff)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
@@ -54,12 +54,10 @@ def main():
         raise ValueError("Duplicate grid_index detected")
 
     # Validate required FOV, col_index, and row_index columns
-    if "FOV" not in gridpos.columns:
-        raise ValueError("'FOV' column is required in grid position CSV")
-    if "col_index" not in gridpos.columns:
-        raise ValueError("'col_index' column is required in grid position CSV")
-    if "row_index" not in gridpos.columns:
-        raise ValueError("'row_index' column is required in grid position CSV")
+    required_cols = {"FOV", "col_index", "row_index", "x_global_px", "y_global_px"}
+    missing = required_cols - set(gridpos.columns)
+    if missing:
+        raise ValueError(f"Missing {', '.join(sorted(missing))}s in grid position CSV")
 
     # Validate directory for field symbolic links
     if not os.path.isdir(args.field_dir):
@@ -71,7 +69,7 @@ def main():
     # Determine grid dimensions
     ncols, nrows = gridpos["col_index"].max() + 1, gridpos["row_index"].max() + 1
     print(f"Parsed grid dimensions: {ncols} columns x {nrows} rows.")
-    grid2fov = gridpos["FOV"].to_dict()
+    grid2meta = gridpos[["FOV", "x_global_px", "y_global_px"]].to_dict(orient="index")
 
     # Read the field tiles using FileSeriesReader
     reader = FileSeriesReader(
@@ -82,7 +80,7 @@ def main():
         overlap=args.overlap,
         pixel_size=args.px_size,
     )
-    nfiles, ngrids = reader.metadata.num_images, len(grid2fov)
+    nfiles, ngrids = reader.metadata.num_images, len(grid2meta)
     if nfiles != ngrids:
         raise ValueError(f"field number mismatch: {nfiles} files but {ngrids} rows")
 
@@ -102,10 +100,22 @@ def main():
         columns=["Position_Y", "Position_X", "Shift_Y", "Shift_X"],
         index=pd.Series([s for _, s in reader.metadata.all_series], name="grid_index"),
     ).round(5)
-    coords_df["FOV"] = coords_df.index.map(grid2fov)
-    coords_df = coords_df.loc[
-        coords_df["FOV"] >= 0,
-        ["FOV", "Position_X", "Position_Y", "Shift_X", "Shift_Y"],
+    coords_df["FOV"] = coords_df.index.map(lambda x: grid2meta[x]["FOV"])
+    coords_df["x_global_px"] = coords_df.index.map(
+        lambda x: grid2meta[x]["x_global_px"]
+    )
+    coords_df["y_global_px"] = coords_df.index.map(
+        lambda x: grid2meta[x]["y_global_px"]
+    )
+    coords_df = coords_df.loc[coords_df["FOV"] >= 0].copy()  # Exclude mock FOVs
+    coords_df = coords_df[
+        "FOV",
+        "Position_X",
+        "Position_Y",
+        "Shift_X",
+        "Shift_Y",
+        "x_global_px",
+        "y_global_px",
     ]
     coords_df.set_index("FOV").to_csv(out_csv)
     print(f"Wrote output to '{out_csv}'.")
