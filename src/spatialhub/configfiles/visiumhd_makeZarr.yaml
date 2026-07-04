@@ -1,0 +1,41 @@
+resources:
+    account: slurm_account
+    threads: 16
+    mem_mb: 64000
+    time: "30:00:00"
+    slurm_partition: short
+
+outdir: /path/to/output/directory
+
+tasks:
+    capture1:
+        cyta_image: /path/to/capture1/cyta_image.tif
+        ms_image: /path/to/capture1/ms_image.tif
+        fq_dir: /path/to/capture1/fq_dir
+        run_name: capture1_runname
+        slide_serial: capture_slide_serial
+        capture_area: capture1_capture_area
+    capture2:
+        cyta_image: /path/to/capture2/cyta_image.tif
+        ms_image: /path/to/capture2/ms_image.tif
+        fq_dir: /path/to/capture2/fq_dir
+        run_name: capture2_runname
+        slide_serial: capture2_slide_serial
+        capture_area: capture2_capture_area
+
+# SpaceRanger parameters
+spaceranger:
+    # custom bin size
+    custom_bin_size: 10
+    # reference transcriptome
+    transcriptome: /path/to/reference/transcriptome
+    # slide file folder
+    slidefiledir: /path/to/slidefiledir
+    # probe set
+    probeset: /path/to/probeset.csv
+    # create bam
+    createbam: False
+
+# SpatialData-io parameters
+make_zarr:
+    use_filtered: True

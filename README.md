@@ -21,3 +21,10 @@ This workflow generates one Zarr file per CosMx sample from raw data. It support
 
 - With Ashlar: cosmx_genBlankFOV, cosmx_completeGrid, cosmx_runAshlar, cosmx_makeZarr.
 - Without Ashlar: cosmx_assembleFOVs, cosmx_makeZarr.
+
+## Visium HD makeZarr
+
+This workflow generates one Zarr file per Visium HD capture area from FASTQ files and images. It consists of two steps:
+
+- Space Ranger count
+- Zarr generation
