@@ -32,16 +32,17 @@ def main():
     p.add_argument("--fov-csv", required=True, help="CosMx FOV position file.")
     p.add_argument("--fov-lst", required=True, help="Comma-separated FOVs to include.")
     p.add_argument("--m2d-pfx", required=True, help="Prefix of Morphology2D paths.")
-    p.add_argument("--mock-path", required=True, help="Path to a blank mock FOV tile.")
+    p.add_argument("--mock-tiff", required=True, help="Path to a blank mock FOV tile.")
     args = p.parse_args()
     print_arguments(args)
 
-    if os.path.exists(args.outdir):
-        raise FileExistsError(f"directory '{args.outdir}' already exists")
+    out_csv = os.path.join(args.outdir, "grid_positions.csv")
+    if os.path.exists(out_csv):
+        raise FileExistsError(f"file '{out_csv}' already exists")
     os.makedirs(os.path.join(args.outdir, "field_links"), exist_ok=False)
 
     # Read mock FOV tile to get width and height
-    _, height, width = imread(args.mock_path).shape
+    _, height, width = imread(args.mock_tiff).shape
     print(f"Parsed grid dimensions: {width} x {height} pixels.")
 
     # Parse FOVs to include
@@ -82,7 +83,7 @@ def main():
             src = f"{args.m2d_pfx}{fov:05}.TIF"
         else:
             fov = -1
-            src = args.mock_path
+            src = args.mock_tiff
             x_px, y_px = xmin_px + icol * width, ymax_px - irow * height
         dest = os.path.join(args.outdir, "field_links", f"F{igrid:05}.TIF")
         rows.append(
@@ -99,7 +100,7 @@ def main():
             raise FileNotFoundError(f"source file '{src}' does not exist")
         os.symlink(src, dest)
     field_pos = pd.DataFrame(rows)
-    field_pos.to_csv(os.path.join(args.outdir, "grid_positions.csv"), index=False)
+    field_pos.to_csv(out_csv, index=False)
 
     print(f"{GREEN}Created {field_pos.shape[0]} field links in {args.outdir}.{RESET}")
 

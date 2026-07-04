@@ -28,3 +28,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[project.scripts]
+spatialhub = "spatialhub.cli:main"

@@ -1,0 +1,43 @@
+resources:
+    account: slurm_account
+    threads: 4
+    mem_mb: 32000
+    time: "4:00:00"
+    partition: "short"
+
+outdir: /path/to/output/directory
+
+ctrl_regex: SystemControl|Negative
+other_regex: Bac|Heli|bac|heli|16S
+fov_width: 4256
+fov_height: 4256
+n_channels: 5
+px_size: 0.120280945
+channels_output: NULL # list of channel indices to output from Ashlar alignment, NULL for all channels
+channel_names: PanCK,CD68,Membrane,CD45,DNA
+scales: 2,8
+
+slides:
+    slide1:
+        fovpos_csv: /path/to/slide1/fov_positions.csv
+        tx_csv: /path/to/slide1/tx_file.csv.gz
+        pg_csv: /path/to/slide1/polygons.csv.gz
+        morph_pfx: /path/to/slide1/Morphology2D/prefix_before_fov_number # file name pattern: prefix{series:5}.TIF
+        samples:
+            SS_prox1a: 1,2,3-5
+            SS_dist1a: 1-12
+    slide2:
+        fovpos_csv: /path/to/slide2/fov_positions.csv
+        tx_csv: /path/to/slide2/tx_file.csv.gz
+        pg_csv: /path/to/slide2/polygons.csv.gz
+        morph_pfx: /path/to/slide2/Morphology2D/prefix_before_fov_number # file name pattern: prefix{series:5}.TIF
+        samples:
+            SS_prox1b: 6-6,1-5
+            SS_dist1b: 181-191,32
+
+run_ashlar: false # run Ashlar to align FOVs and generate a stitched mosaic
+
+ashlar:
+    overlap: 0.01
+    max_shift: 15 # maximum shift in microns for Ashlar alignment
+    align_channel: 0 # channel index to use for Ashlar alignment

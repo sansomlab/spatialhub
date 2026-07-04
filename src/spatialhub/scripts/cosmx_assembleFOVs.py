@@ -35,8 +35,8 @@ def main():
     args = p.parse_args()
     print_arguments(args)
 
-    out_tiff = os.path.join(args.outdir, "assembled.ome.tiff")
-    out_csv = os.path.join(args.outdir, "assembled.positions.csv")
+    out_tiff = os.path.join(args.outdir, "image.ome.tiff")
+    out_csv = os.path.join(args.outdir, "FOV.positions.csv")
     if os.path.exists(out_tiff) or os.path.exists(out_csv):
         raise FileExistsError(f"output file '{out_csv}' or '{out_tiff}' already exists")
     os.makedirs(args.outdir, exist_ok=True)

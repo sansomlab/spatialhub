@@ -1,6 +1,6 @@
 # SpatialHub - Pipelines for Spatial Transcriptomics Analysis
 
->**⚠️ WARNING: SpatialHub is currently in pre-release and under active development. Although we have taken great care to ensure its quality and reliability, bugs and breaking changes may still occur. Please use it with caution and report any issues by opening a GitHub issue.**
+> **⚠️ WARNING: SpatialHub is currently in pre-release and under active development. Although we have taken great care to ensure its quality and reliability, bugs and breaking changes may still occur. Please use it with caution and report any issues by opening a GitHub issue.**
 
 ## Installation
 
@@ -12,3 +12,12 @@ cd /path/to/spatialhub_dev/
 uv pip install -e .
 spatialhub --version
 ```
+
+## Workflows
+
+### CosMx makeZarr
+
+This workflow generates one Zarr file per CosMx sample from raw data. It supports two branches depending on whether Ashlar is used.
+
+- With Ashlar: cosmx_genBlankFOV, cosmx_completeGrid, cosmx_runAshlar, cosmx_makeZarr.
+- Without Ashlar: cosmx_assembleFOVs, cosmx_makeZarr.

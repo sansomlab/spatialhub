@@ -21,7 +21,7 @@ from spatialhub.scripts.utils import GREEN, RESET, print_arguments, die
 
 def main():
     p = AP(description="Run Ashlar on CosMx FOV tiles.")
-    p.add_argument("--out-pfx", required=True, help="Prefix for the output files.")
+    p.add_argument("outdir", help="Directory for the output files.")
     p.add_argument("--gridpos-csv", required=True, help="Grid position CSV file.")
     p.add_argument("--field-dir", required=True, help="Field directory for stitching.")
     p.add_argument("--name-pattern", required=True, help="Pattern for FOV filenames.")
@@ -33,13 +33,13 @@ def main():
     args = p.parse_args()
     print_arguments(args)
 
-    out_csv = f"{args.out_pfx}stitched.positions.csv"
-    out_tiff = f"{args.out_pfx}stitched.ome.tiff"
+    out_csv = os.path.join(args.outdir, "FOV.positions.csv")
+    out_tiff = os.path.join(args.outdir, "image.ome.tiff")
     if os.path.exists(out_csv) or os.path.exists(out_tiff):
         raise FileExistsError(f"output file '{out_csv}' or '{out_tiff}' already exists")
-    out_dir = os.path.dirname(out_tiff)
-    if out_dir:
-        os.makedirs(out_dir, exist_ok=True)
+    outdir = os.path.dirname(out_tiff)
+    if outdir:
+        os.makedirs(outdir, exist_ok=True)
     print(f"Output files will be written to '{out_csv}' and '{out_tiff}'.")
 
     if not os.path.exists(args.gridpos_csv):

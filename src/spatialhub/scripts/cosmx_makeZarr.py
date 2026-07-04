@@ -6,7 +6,7 @@ import spatialdata as spd
 
 from argparse import ArgumentParser as AP
 from shapely import Polygon
-from spatialhub.scripts.utils import die, print_arguments, RESET, YELLOW
+from spatialhub.scripts.utils import die, print_arguments, RESET, YELLOW, GREEN
 
 
 def transform_coordinates(points_df, fov2pos):
@@ -28,7 +28,7 @@ def transform_coordinates(points_df, fov2pos):
 def main():
     p = AP(description="Prepare a Zarr object from CosMx data.")
     # Required arguments
-    p.add_argument("--out-zarr", required=True, help="Output Zarr directory.")
+    p.add_argument("output", help="Output Zarr directory.")
     p.add_argument("--fov-csv", required=True, help="CosMx FOV position CSV file.")
     p.add_argument("--tx-csv", required=True, help="CosMx transcript CSV file.")
     p.add_argument("--morph-tiff", required=True, help="Assembled/stitched TIFF image.")
@@ -41,12 +41,12 @@ def main():
     args = p.parse_args()
     print_arguments(args)
 
-    if os.path.exists(args.out_zarr):
-        raise FileExistsError(f"output file {args.out_zarr} already exists")
-    out_dir = os.path.dirname(args.out_zarr)
+    if os.path.exists(args.output):
+        raise FileExistsError(f"output file {args.output} already exists")
+    out_dir = os.path.dirname(args.output)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
-    print(f"Output Zarr directory will be created at '{args.out_zarr}'.")
+    print(f"Output Zarr directory will be created at '{args.output}'.")
 
     if not os.path.exists(args.fov_csv):
         raise FileNotFoundError(f"FOV position file '{args.fov_csv}' not found")
@@ -141,7 +141,9 @@ def main():
     else:
         shapes = None
 
-    spd.SpatialData(images=images, points=points, shapes=shapes).write(args.out_zarr)
+    spd.SpatialData(images=images, points=points, shapes=shapes).write(args.output)
+
+    print(f"{GREEN}Zarr dataset created successfully.{RESET}")
 
 
 if __name__ == "__main__":
