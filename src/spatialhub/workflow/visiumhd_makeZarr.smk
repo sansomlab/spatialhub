@@ -6,7 +6,11 @@ import warnings
 configfile: "visiumhd_makeZarr.yaml"
 
 
-LOCK = config["lock"].lower()  # [NOTE] this key is set by the CLI, not the config file!
+# [NOTE] this key is set by the CLI, not the config file!
+if "lock" in config:
+    LOCK = config["lock"].lower()
+else:
+    LOCK = "false"
 
 RESOURCES = {"threads": 4, "mem_mb": 16000, "time": "04:00:00", "partition": "short"}
 RESOURCES.update(config.get("resources", {}))
@@ -63,33 +67,24 @@ rule make_zarr:
     params:
         outdir=os.path.join(config["outdir"], "zarr.dir"),
         cap="{cap}",
-        use_filtered=config["make_zarr"].get("use_filtered", True),
-    run:
-        import warnings
-        import spatialdata_io as spdio
-        from contextlib import redirect_stdout, redirect_stderr
-
-        with open(log[0], "w") as log_file:
-            with redirect_stdout(log_file), redirect_stderr(log_file):
-                with warnings.catch_warnings():
-                    warnings.filterwarnings(
-                        "ignore",
-                        category=UserWarning,
-                        message=".*Variable names are not unique.*",
-                    )
-                    sdata = spdio.visium_hd(
-                        path=os.path.join(os.path.dirname(input[0]), "outs"),
-                        dataset_id=params.cap,
-                        filtered_counts_file=params.use_filtered,
-                        load_segmentations_only=False,
-                        load_nucleus_segmentations=True,
-                        bins_as_squares=True,
-                        annotate_table_by_labels=True,
-                        fullres_image_file=task_dict[params.cap].get("Image"),
-                        load_all_images=True,
-                        var_names_make_unique=True,
-                    )
-                sdata.write(os.path.join(params.outdir, f"{params.cap}.zarr"))
+        use_raw_cmd="--use-raw" if config["make_zarr"].get("use_raw") else "",
+        fimg_cmd=(
+            lambda wc: (
+                f"--fullres-img {task_dict[wc.cap].get('fullres_img')}"
+                if task_dict[wc.cap].get("fullres_img")
+                else ""
+            )
+        ),
+    shell:
+        """
+        python -m spatialhub.scripts.visiumhd_makeZarr \
+            {params.outdir} \
+            --sr-dir {input} \
+            --capture-id {params.cap} \
+            {params.use_raw_cmd} \
+            {params.fimg_cmd} \
+            >{log} 2>&1
+        """
 
 
 rule spaceranger_count:

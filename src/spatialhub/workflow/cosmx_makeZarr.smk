@@ -5,7 +5,11 @@ import pandas as pd
 configfile: "cosmx_makeZarr.yaml"
 
 
-LOCK = config["lock"].lower()  # [NOTE] this key is set by the CLI, not the config file!
+# [NOTE] this key is set by the CLI, not the config file!
+if "lock" in config:
+    LOCK = config["lock"].lower()
+else:
+    LOCK = "false"
 
 RESOURCES = {"threads": 4, "mem_mb": 16000, "time": "04:00:00", "partition": "short"}
 RESOURCES.update(config.get("resources", {}))

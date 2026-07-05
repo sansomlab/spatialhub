@@ -16,7 +16,7 @@ def welcome_message():
     print()
     print("=" * width)
     print(f"Welcome to SpatialHub (v{__version__})!".center(width))
-    print("An Integrated Platform for Spatial Transcriptomics Analysis.".center(width))
+    print("Pipelines for Spatial Transcriptomics Analysis.".center(width))
     print("=" * width)
     print()
 

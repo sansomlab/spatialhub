@@ -26,5 +26,5 @@ This workflow generates one Zarr file per CosMx sample from raw data. It support
 
 This workflow generates one Zarr file per Visium HD capture area from FASTQ files and images. It consists of two steps:
 
-- Space Ranger count
-- Zarr generation
+- Space Ranger count,
+- Zarr generation.
