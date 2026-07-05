@@ -59,13 +59,12 @@ rule make_zarr:
     input:
         os.path.join(config["outdir"], "spaceranger.dir", "{cap}"),
     output:
-        directory(os.path.join(config["outdir"], "zarr.dir", "{cap}.zarr")),
+        outdir=directory(os.path.join(config["outdir"], "zarr.dir", "{cap}.zarr")),
     log:
         os.path.join(config["outdir"], "zarr.dir", "visiumhd_makeZarr.{cap}.log"),
     resources:
         **RESOURCES,
     params:
-        outdir=os.path.join(config["outdir"], "zarr.dir"),
         cap="{cap}",
         use_raw_cmd="--use-raw" if config["make_zarr"].get("use_raw") else "",
         fimg_cmd=(
@@ -78,7 +77,7 @@ rule make_zarr:
     shell:
         """
         python -m spatialhub.scripts.visiumhd_makeZarr \
-            {params.outdir} \
+            {output.outdir} \
             --sr-dir {input} \
             --capture-id {params.cap} \
             {params.use_raw_cmd} \
