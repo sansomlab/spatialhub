@@ -1,6 +1,6 @@
-import argparse
 import subprocess
 
+from argparse import ArgumentParser as AP
 from importlib.resources import files
 from pathlib import Path
 from spatialhub import __version__
@@ -66,26 +66,24 @@ def main():
     vinfo = f"%(prog)s {__version__}"
 
     # Parse command-line arguments
-    parser = argparse.ArgumentParser(
-        description="An integrated platform for spatial transcriptomics analysis."
-    )
-    parser.add_argument("module", help="The module to run.")
-    parser.add_argument("task", help="The task to run, [config|full|<rulename>].")
-    parser.add_argument("--dry", action="store_true", help="Perform a dry run only.")
-    parser.add_argument("--cores", default="all", help="Number of cores to use.")
-    parser.add_argument("--jobs", default="1", help="Number of parallel jobs to run.")
-    parser.add_argument("--lock", action="store_true", help="Lock output by chmod.")
-    parser.add_argument("-v", "--version", action="version", version=vinfo)
-    args = parser.parse_args()
+    p = AP(description="Pipelines for Spatial Transcriptomics Analysis.")
+    p.add_argument("workflow", help="The workflow to run.")
+    p.add_argument("task", help="The task to run, [config|full|<rulename>].")
+    p.add_argument("--dry", action="store_true", help="Perform a dry run only.")
+    p.add_argument("--cores", default="all", help="Number of cores to use.")
+    p.add_argument("--jobs", default="1", help="Number of parallel jobs to run.")
+    p.add_argument("--lock", action="store_true", help="Lock output by chmod.")
+    p.add_argument("-v", "--version", action="version", version=vinfo)
+    args = p.parse_args()
 
     # Determine the path to the Snakefile
-    smkpath = files("spatialhub").joinpath("workflow", f"{args.module}.smk")
+    smkpath = files("spatialhub").joinpath("workflow", f"{args.workflow}.smk")
 
     if args.lock and args.task == "config":
         print(f"{GREEN}[INFO] `--lock` is ignored when running config task.{RESET}")
 
     if args.task == "config":
-        copy_config_file(args.module)
+        copy_config_file(args.workflow)
     else:
         run_snakemake(
             smkpath,

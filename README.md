@@ -24,12 +24,12 @@ spatialhub $module_name full
 The complete command-line interface is shown below:
 
 ```text
-usage: spatialhub [-h] [--dry] [--cores CORES] [--jobs JOBS] [--lock] [-v] module task
+usage: spatialhub [-h] [--dry] [--cores CORES] [--jobs JOBS] [--lock] [-v] workflow task
 
-An integrated platform for spatial transcriptomics analysis.
+Pipelines for Spatial Transcriptomics Analysis.
 
 positional arguments:
-  module         The module to run.
+  workflow       The workflow to run.
   task           The task to run, [config|full|<rulename>].
 
 options:
