@@ -9,7 +9,7 @@ uv venv -p 3.12 spatialhub-py312
 source spatialhub-py312/bin/activate
 python --version  # Python 3.12.12
 cd /path/to/spatialhub_dev/
-uv pip install -e .
+uv pip install .
 spatialhub --version
 ```
 
@@ -18,8 +18,10 @@ spatialhub --version
 SpatialHub provides the following command-line interface (CLI). A minimal example is shown below:
 
 ```bash
-spatialhub $module_name full
+spatialhub $workflow_name full
 ```
+
+For the available `$workflow_name` values, please refer to the [Workflow⁠](#workflows) section below.
 
 The complete command-line interface is shown below:
 
@@ -51,14 +53,14 @@ chmod -R +w /folder/to/delete
 
 ## Workflows
 
-### CosMx makeZarr
+### cosmx_makeZarr
 
 This workflow generates one Zarr file per CosMx sample from raw data. It supports two branches depending on whether Ashlar is used.
 
 - With Ashlar: cosmx_genBlankFOV, cosmx_completeGrid, cosmx_runAshlar, cosmx_makeZarr.
 - Without Ashlar: cosmx_assembleFOVs, cosmx_makeZarr.
 
-### Visium HD makeZarr
+### visiumhd_makeZarr
 
 This workflow generates one Zarr file per Visium HD capture area from FASTQ files and images. It consists of two steps:
 
