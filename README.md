@@ -51,6 +51,12 @@ To unlock the output directory for modification or deletion, run:
 chmod -R +w /folder/to/delete
 ```
 
+A built-in task, `config`, is provided to generate a template configuration YAML file, i.e.,
+
+```bash
+spatialhub $workflow_name config
+```
+
 ## Workflows
 
 ### cosmx_makeZarr
