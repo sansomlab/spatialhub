@@ -1,0 +1,17 @@
+resources:
+    account: slurm_account
+    threads: 16
+    mem_mb: 64000
+    time: "30:00:00"
+    slurm_partition: short
+
+outdir: /path/to/output/directory
+
+square_002um_dir: /path/to/SpaceRanger/square_002um/folder
+source_image_path: /path/to/source/image.tif
+spaceranger_spatial_dir: /path/to/SpaceRanger/spatial/folder
+min_cells: 3
+min_counts: 1
+mpp_lst: 0.1,0.3,0.5
+destripe: True
+probability_threshold_lst: 0.01,0.5

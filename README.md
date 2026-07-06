@@ -73,6 +73,10 @@ This workflow generates one Zarr file per Visium HD capture area from FASTQ file
 - Space Ranger count,
 - Zarr generation.
 
+### `visiumhd_prepareBin2Cell`
+
+This workflow generates intermediate files up to the StarDist step of the Bin2Cell pipeline.
+
 ### `shared_extractH5AD` and `shared_aggregateH5AD`
 
 Both workflows generate an `AnnData` object stored in an `H5AD` file from a `SpatialData` object stored in a `Zarr` file.
