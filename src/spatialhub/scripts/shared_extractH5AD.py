@@ -16,7 +16,9 @@ def main():
 
     if args.extract not in sdata:
         raise ValueError(f"Table '{args.extract}' not found in Zarr file.")
-    sdata[args.extract].write(args.h5adout, compression="gzip")
+    adata = sdata[args.extract].copy()  # Extract the specified table as AnnData
+    adata.layers["counts"] = adata.X.copy()  # Ensure counts layer is present
+    adata.write(args.h5adout, compression="gzip")
 
     print(f"{GREEN}Successfully extracted AnnData.{RESET}")
 

@@ -47,7 +47,7 @@ rule make_h5ad:
             cap="{cap}",
         ),
     log:
-        os.path.join(config["workdir"], "h5ad.dir", "extractH5AD.{cap}.{table}.log"),
+        os.path.join(config["workdir"], "h5ad.dir", "{cap}.{table}.extractH5AD.log"),
     resources:
         **RESOURCES,
     params:

@@ -8,6 +8,7 @@ dependencies = [
     "snakemake-executor-plugin-drmaa",
     "ashlar",
     "anndata",
+    "cell2location",
     "scanpy>=1.12.1",
     "harmonypy",
     "scvi-tools",

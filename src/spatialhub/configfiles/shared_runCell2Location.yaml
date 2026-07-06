@@ -1,0 +1,20 @@
+resources:
+    account: slurm_account
+    threads: 2
+    mem_mb: 128000
+    time: "30:00:00"
+    partition: "short"
+
+outdir: /path/to/cell2location/output/folder/
+reference: /path/to/curated/reference/atlas/anndata.h5ad
+query: /path/to/query/spatial/transcriptomics/anndata.h5ad
+
+batch_key: batch # a column in the reference anndata.obs that contains the batch information
+categorical_covariates: cat1,cat2 # a comma-separated list of columns in the reference anndata.obs that contain categorical covariates
+continuous_covariates: ctn1,ctn2 # a comma-separated list of columns in the reference anndata.obs that contain continuous covariates
+label_key: celltype # a column in the reference anndata.obs that contains the cell type annotation to be deconvolved
+max_epochs_reg: 400
+qt_lst: q05,q50,q95,q0001 # a comma-separated list of quantiles to be computed for the posterior distribution of the cell abundance estimates
+n_cellperloc: 50 # the number of cells per location to be used for the cell2location model
+detection_alpha: 20.0 # the alpha value to be used for the detection threshold of cell abundance estimates
+max_epochs_c2l: 30000 # max number of epochs for deconvolution

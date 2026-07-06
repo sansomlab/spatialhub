@@ -1,0 +1,27 @@
+resources:
+    account: slurm_account
+    threads: 2
+    mem_mb: 32000
+    time: "4:00:00"
+    partition: "short"
+
+outdir: /path/to/rctd/output/folder/
+mode: full # options: full|doublet|multi
+
+tasks:
+    task1:
+        reference: /path/to/curated/reference/atlas/anndata.h5ad
+        query: /path/to/query/spatial/data/task1.h5ad
+        celltype: celltype # a column in the reference anndata.obs that contains the cell type annotation to be deconvolved
+        min_umi: 20
+        min_umi_sigma: 60
+        xcoord: array_col
+        ycoord: array_row
+    task2:
+        reference: /path/to/curated/reference/atlas/anndata.h5ad
+        query: /path/to/query/spatial/data/task2.h5ad
+        celltype: celltype # a column in the reference anndata.obs that contains the cell type annotation to be deconvolved
+        min_umi: 20
+        min_umi_sigma: 60
+        xcoord: array_col
+        ycoord: array_row
