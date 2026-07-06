@@ -1,0 +1,14 @@
+resources:
+    account: slurm_account
+    threads: 16
+    mem_mb: 64000
+    time: "01:00:00"
+    slurm_partition: short
+
+workdir: /path/to/working/directory/with/zarr.dir/and/to/create/h5ad.dir
+
+capture_ids: capture1,capture2
+points_from: main
+shapes_by: atomx
+agg_func: sum
+coords: "global"

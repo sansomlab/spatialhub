@@ -1,3 +1,4 @@
+import os
 import spatialdata as spd
 
 from argparse import ArgumentParser as AP
@@ -11,6 +12,9 @@ def main():
     p.add_argument("--extract", required=True, help="Table name to extract.")
     args = p.parse_args()
     print_arguments(args)
+
+    if os.path.exists(args.h5adout):
+        raise FileExistsError(f"Output file {args.h5adout} already exists.")
 
     sdata = spd.read_zarr(args.in_zarr)
 
