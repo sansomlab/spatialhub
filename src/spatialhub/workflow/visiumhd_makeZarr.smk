@@ -69,8 +69,8 @@ rule make_zarr:
         use_raw_cmd="--use-raw" if config["make_zarr"].get("use_raw") else "",
         fimg_cmd=(
             lambda wc: (
-                f"--fullres-img {task_dict[wc.cap].get('fullres_img')}"
-                if task_dict[wc.cap].get("fullres_img")
+                f"--fullres-img {task_dict[wc.cap].get('ms_image')}"
+                if task_dict[wc.cap].get("ms_image")
                 else ""
             )
         ),

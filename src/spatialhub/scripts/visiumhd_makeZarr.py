@@ -29,7 +29,7 @@ def main():
     if args.fullres_img and not os.path.exists(args.fullres_img):
         raise FileNotFoundError(f"Full-resolution image '{args.fullres_img}' not found")
 
-    sdata = spdio.visium_hd(
+    spdio.visium_hd(
         path=inpath,
         dataset_id=args.capture_id,
         filtered_counts_file=not args.use_raw,
@@ -40,8 +40,7 @@ def main():
         fullres_image_file=args.fullres_img,
         load_all_images=True,
         var_names_make_unique=True,
-    )
-    sdata.write(os.path.join(args.output, f"{args.capture_id}.zarr"))
+    ).write(args.output)
 
     print(f"{GREEN}Zarr dataset created successfully.{RESET}")
 
