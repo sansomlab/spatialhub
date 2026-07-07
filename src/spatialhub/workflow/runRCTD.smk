@@ -3,7 +3,7 @@ import os
 from spatialhub.workflow.utils import opt2cmd
 
 
-configfile: "shared_runRCTD.yaml"
+configfile: "runRCTD.yaml"
 
 
 # [NOTE] this key is set by the CLI, not the config file!
@@ -56,7 +56,7 @@ rule run_rctd:
         ),
     shell:
         """
-        python -m spatialhub.scripts.shared_runRCTD \
+        python -m spatialhub.scripts.runRCTD \
             {output} \
             --ref {input.reference} \
             --qry {input.query} \

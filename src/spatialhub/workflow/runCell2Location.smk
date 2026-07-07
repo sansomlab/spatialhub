@@ -3,7 +3,7 @@ import os
 from spatialhub.workflow.utils import opt2cmd
 
 
-configfile: "shared_runCell2Location.yaml"
+configfile: "runCell2Location.yaml"
 
 
 # [NOTE] this key is set by the CLI, not the config file!
@@ -70,7 +70,7 @@ rule run_cell2location:
         mepoch_c2l_cmd=opt2cmd(config.get("max_epochs_c2l"), "--max-epochs-c2l"),
     shell:
         """
-        python -m spatialhub.scripts.shared_runCell2Location \
+        python -m spatialhub.scripts.runCell2Location \
             {params.outdir} \
             --ref {input.reference} \
             --qry {input.query} \

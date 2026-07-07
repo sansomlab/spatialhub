@@ -1,7 +1,7 @@
 import os
 
 
-configfile: "shared_aggregateH5AD.yaml"
+configfile: "extractH5AD.yaml"
 
 
 # [NOTE] this key is set by the CLI, not the config file!
@@ -13,17 +13,15 @@ else:
 RESOURCES = {"threads": 4, "mem_mb": 16000, "time": "04:00:00", "partition": "short"}
 RESOURCES.update(config.get("resources", {}))
 
+extract_tables = map(str.strip, config["extract_tables"].split(","))
+
 
 rule full:
     input:
         expand(
-            os.path.join(
-                config["workdir"], "h5ad.dir", "{cap}.{points}.{shapes}.{agg}.h5ad"
-            ),
+            os.path.join(config["workdir"], "h5ad.dir", "{cap}.{table}.h5ad"),
+            table=extract_tables,
             cap=map(str.strip, config["capture_ids"].split(",")),
-            points=[config["points_from"]],
-            shapes=[config["shapes_by"]],
-            agg=[config["agg_func"]],
         ),
     resources:
         **RESOURCES,
@@ -43,29 +41,24 @@ rule make_h5ad:
     input:
         os.path.join(config["workdir"], "zarr.dir", "{cap}.zarr"),
     output:
-        os.path.join(
-            config["workdir"], "h5ad.dir", "{cap}.{points}.{shapes}.{agg}.h5ad"
+        expand(
+            os.path.join(config["workdir"], "h5ad.dir", "{cap}.{table}.h5ad"),
+            table="{table}",
+            cap="{cap}",
         ),
     log:
-        os.path.join(
-            config["workdir"], "h5ad.dir", "{cap}.{points}.{shapes}.{agg}.aggH5AD.log"
-        ),
+        os.path.join(config["workdir"], "h5ad.dir", "{cap}.{table}.extractH5AD.log"),
     resources:
         **RESOURCES,
     params:
+        outdir=os.path.join(config["workdir"], "h5ad.dir"),
         cap="{cap}",
-        points="{points}",
-        shapes="{shapes}",
-        agg="{agg}",
-        coords=config["coords"],
+        tables="{table}",
     shell:
         """
-        python -m spatialhub.scripts.shared_aggregateH5AD \
-            {output} \
+        python -m spatialhub.scripts.extractH5AD \
+            {params.outdir}/{params.cap}.{params.tables}.h5ad \
             --in-zarr {input} \
-            --points-from {params.points} \
-            --shapes-by {params.shapes} \
-            --agg-func {params.agg} \
-            --coords {params.coords} \
+            --extract {params.tables} \
             >{log} 2>&1
         """
