@@ -1,0 +1,21 @@
+resources:
+    account: slurm_account
+    threads: 16
+    mem_mb: 96000
+    time: "04:00:00"
+    slurm_partition: short
+
+zarr_dir: /path/to/zarr/directory
+
+shapes_to_add:
+    cellpose:
+        ch_nuc: DNA
+        ch_cyto: Membrane
+        mdl_path: /path/to/cellpose/model
+        dp: 125
+        gpu: true
+        img_key: image
+        flow_threshold: 0.4
+        cellprob_threshold: 0.0
+        clip_limit: 0.2
+        gaussian_sigma: 1
