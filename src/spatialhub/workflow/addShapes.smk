@@ -49,7 +49,9 @@ rule add_cellpose:
     input:
         zarr_in=os.path.join(config["zarr_dir"], "{fname}"),
     output:
-        os.path.join(config["zarr_dir"], "{fname}", "shapes", "cellpose_segments"),
+        directory(
+            os.path.join(config["zarr_dir"], "{fname}", "shapes", "cellpose_segments")
+        ),
     log:
         os.path.join(config["zarr_dir"], "{fname}.addShapeCellpose.log"),
     resources:

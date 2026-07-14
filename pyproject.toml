@@ -19,7 +19,7 @@ dependencies = [
     "spatialdata-io",
     "spatialdata-plot",
     "rctd-py",
-    "spin @ git+https://github.com/wanglab-broad/spin@main",
+    "sopa[cellpose]",
     "ipykernel",
 ]
 requires-python = ">=3.12"
