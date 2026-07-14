@@ -5,10 +5,10 @@ resources:
     time: "01:00:00"
     slurm_partition: short
 
-workdir: /path/to/working/directory/with/zarr.dir/and/to/create/h5ad.dir
+zarr_dir: /path/to/directory/containing/zarr/files
+h5ad_dir: /path/to/directory/for/h5ad/files/to/be/created
 
-capture_ids: capture1,capture2
-points_from: main
-shapes_by: atomx
+points_from: main,ctrl
+shapes_by: atomx_segments,cellpose_segments
 agg_func: sum
-coords: "global"
+coords: global

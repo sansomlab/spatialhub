@@ -13,23 +13,31 @@ else:
 RESOURCES = {"threads": 4, "mem_mb": 16000, "time": "04:00:00", "partition": "short"}
 RESOURCES.update(config.get("resources", {}))
 
+CAPTURE_IDS = [
+    cap.replace(".zarr", "")
+    for cap in os.listdir(config["zarr_dir"])
+    if cap.endswith(".zarr")
+]
+
 
 rule full:
     input:
         expand(
             os.path.join(
-                config["workdir"], "h5ad.dir", "{cap}.{points}.{shapes}.{agg}.h5ad"
+                config["h5ad_dir"],
+                "{cap}.{points}.{shapes}.{agg}.{coords}.h5ad",
             ),
-            cap=map(str.strip, config["capture_ids"].split(",")),
-            points=[config["points_from"]],
-            shapes=[config["shapes_by"]],
-            agg=[config["agg_func"]],
+            cap=CAPTURE_IDS,
+            points=map(str.strip, config["points_from"].split(",")),
+            shapes=map(str.strip, config["shapes_by"].split(",")),
+            agg=map(str.strip, config["agg_func"].split(",")),
+            coords=map(str.strip, config["coords"].split(",")),
         ),
     resources:
         **RESOURCES,
     params:
         lock=LOCK,
-        h5ad_dir=os.path.join(config["workdir"], "h5ad.dir"),
+        h5ad_dir=config["h5ad_dir"],
     shell:
         """
         if [ {params.lock} = true ]; then
@@ -41,14 +49,12 @@ rule full:
 
 rule make_h5ad:
     input:
-        os.path.join(config["workdir"], "zarr.dir", "{cap}.zarr"),
+        os.path.join(config["zarr_dir"], "{cap}.zarr"),
     output:
-        os.path.join(
-            config["workdir"], "h5ad.dir", "{cap}.{points}.{shapes}.{agg}.h5ad"
-        ),
+        os.path.join(config["h5ad_dir"], "{cap}.{points}.{shapes}.{agg}.{coords}.h5ad"),
     log:
         os.path.join(
-            config["workdir"], "h5ad.dir", "{cap}.{points}.{shapes}.{agg}.aggH5AD.log"
+            config["h5ad_dir"], "aggH5AD.{cap}.{points}.{shapes}.{agg}.{coords}.log"
         ),
     resources:
         **RESOURCES,

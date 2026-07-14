@@ -29,12 +29,12 @@ def main():
         raise FileExistsError(f"Output file {args.h5adout} already exists.")
 
     sdata = spd.read_zarr(args.in_zarr)
-    sdata["atomx"].set_index(sdata["atomx"].columns[0], inplace=True)
     adata = sdata.aggregate(
         values=args.points_from,
         by=args.shapes_by,
         agg_func=args.agg_func,
         target_coordinate_system=args.coords,
+        deepcopy=True,
     )["table"]
     centroids = sdata[args.shapes_by].loc[adata.obs_names, "geometry"].centroid
     adata.obs[["array_col", "array_row"]] = [[c.x, c.y] for c in centroids]
