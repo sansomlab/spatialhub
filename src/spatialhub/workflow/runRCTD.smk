@@ -48,6 +48,7 @@ rule run_rctd:
         **RESOURCES,
     params:
         celltype=lambda wc: task_dict[wc.task]["celltype"],
+        mode=config.get("mode", "full"),
         xcoord_cmd=lambda wc: opt2cmd(task_dict[wc.task].get("xcoord"), "--xcoord"),
         ycoord_cmd=lambda wc: opt2cmd(task_dict[wc.task].get("ycoord"), "--ycoord"),
         min_umi_cmd=lambda wc: opt2cmd(task_dict[wc.task].get("min_umi"), "--min-umi"),
@@ -61,6 +62,7 @@ rule run_rctd:
             --ref {input.reference} \
             --qry {input.query} \
             --celltype {params.celltype} \
+            --mode {params.mode} \
             {params.xcoord_cmd} \
             {params.ycoord_cmd} \
             {params.min_umi_cmd} \
