@@ -67,6 +67,8 @@ rule add_cellpose:
         mdl_path=SHAPES_TO_ADD["cellpose"]["mdl_path"],
         dp=SHAPES_TO_ADD["cellpose"]["dp"],
         gpu_cmd="--gpu" if SHAPES_TO_ADD["cellpose"].get("gpu") else "",
+        patch_width=SHAPES_TO_ADD["cellpose"].get("patch_width", None),
+        patch_overlap=SHAPES_TO_ADD["cellpose"].get("patch_overlap", 50),
         img_key=SHAPES_TO_ADD["cellpose"].get("img_key", "image"),
         flow_thr=SHAPES_TO_ADD["cellpose"].get("flow_thr", 0.4),
         pb_thr=SHAPES_TO_ADD["cellpose"].get("pb_thr", 0.0),
@@ -82,6 +84,8 @@ rule add_cellpose:
             --mdl-path {params.mdl_path} \
             --dp {params.dp} \
             {params.gpu_cmd} \
+            --pwidth {params.patch_width} \
+            --povlp {params.patch_overlap} \
             --img-key {params.img_key} \
             --flow-thr {params.flow_thr} \
             --pb-thr {params.pb_thr} \

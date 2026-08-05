@@ -20,6 +20,8 @@ def main():
     p.add_argument("--mdl-path", required=True, help="Path to CellPose model.")
     p.add_argument("--dp", default=DP, type=float, help="Prior cell diameter (pixels).")
     p.add_argument("--gpu", action="store_true", help="Use GPU for CellPose.")
+    p.add_argument("--pwidth", default=None, type=int, help="Patch width for CellPose.")
+    p.add_argument("--povlp", default=50, type=int, help="Patch overlap for CellPose.")
     p.add_argument("--img-key", default="image", help="Zarr key for the image data.")
     p.add_argument("--flow-thr", default=0.4, type=float, help="Flow threshold.")
     p.add_argument("--pb-thr", default=0, type=float, help="Cellprob threshold.")
@@ -44,8 +46,7 @@ def main():
         channels = args.ch_nuc
     print(f"Using channel {channels} for CellPose segmentation.")
 
-    dim = sdata[args.img_key].shape[1:3]
-    sopa.make_image_patches(sdata, patch_width=max(dim), patch_overlap=0)
+    sopa.make_image_patches(sdata, patch_width=args.pwidth, patch_overlap=args.povlp)
     sopa.segmentation.cellpose(
         sdata,
         channels=channels,

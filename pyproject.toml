@@ -2,7 +2,7 @@
 name = "spatialhub"
 version = "0.1.0"
 description = "Pipelines for Spatial Transcriptomics Analysis."
-authors = [{ name = "Sansom Lab", email = "" }]
+authors = [{ name = "Sansom lab", email = "stephen.sansom@kennedy.ox.ac.uk" }]
 dependencies = [
     "snakemake>=9",
     "snakemake-executor-plugin-drmaa",
@@ -10,7 +10,6 @@ dependencies = [
     "pandas==2.3.3",
     "anndata==0.12.16",
     "bin2cell",
-    "stardist",
     "tensorflow",
     "cell2location",
     "scanpy>=1.12.1",

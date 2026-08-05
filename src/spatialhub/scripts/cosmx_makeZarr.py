@@ -133,11 +133,9 @@ def main():
         nsk = pg["cell"].nunique() - len(segments)
         if nsk > 0:
             print(f"{YELLOW}Warning: {nsk} segments have insufficient points.{RESET}")
-        shapes = {
-            "atomx": spd.models.ShapesModel.parse(
-                gpd.GeoDataFrame(segments, geometry="geometry", crs=None)
-            )
-        }
+        gdf = gpd.GeoDataFrame(segments, geometry="geometry", crs=None)
+        gdf.set_index("cell_id", inplace=True)
+        shapes = {"atomx_segments": spd.models.ShapesModel.parse(gdf)}
     else:
         shapes = None
 

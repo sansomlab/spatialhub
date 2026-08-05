@@ -14,6 +14,9 @@ else:
 RESOURCES = {"threads": 4, "mem_mb": 16000, "time": "04:00:00", "partition": "short"}
 RESOURCES.update(config.get("resources", {}))
 
+if not os.path.exists(config["outdir"]):
+    os.makedirs(config["outdir"], exist_ok=False)
+
 task_dict = {}
 for slide, slide_config in config["slides"].items():
     fovpos_csv = slide_config["fovpos_csv"]
