@@ -70,8 +70,8 @@ rule add_cellpose:
         patch_width=SHAPES_TO_ADD["cellpose"].get("patch_width", None),
         patch_overlap=SHAPES_TO_ADD["cellpose"].get("patch_overlap", 50),
         img_key=SHAPES_TO_ADD["cellpose"].get("img_key", "image"),
-        flow_thr=SHAPES_TO_ADD["cellpose"].get("flow_thr", 0.4),
-        pb_thr=SHAPES_TO_ADD["cellpose"].get("pb_thr", 0.0),
+        flow_thr=SHAPES_TO_ADD["cellpose"].get("flow_threshold", 2),
+        pb_thr=SHAPES_TO_ADD["cellpose"].get("cellprob_threshold", -6),
         clip_limit=SHAPES_TO_ADD["cellpose"].get("clip_limit", 0.2),
         gaussian_sigma=SHAPES_TO_ADD["cellpose"].get("gaussian_sigma", 1),
     shell:
