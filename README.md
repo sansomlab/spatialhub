@@ -52,7 +52,7 @@ A special feature is provided via the `--lock` option. When enabled, SpatialHub 
 To unlock the output directory for modification or deletion, run:
 
 ```bash
-chmod -R +w /folder/to/delete
+chmod -R +w /folder/to/unlock
 ```
 
 A built-in task, `config`, is provided to generate a template configuration YAML file, i.e.,

@@ -14,6 +14,8 @@ shapes_to_add:
         mdl_path: /path/to/cellpose/model
         dp: 125
         gpu: true
+        patch_width: NULL
+        patch_overlap: 50
         img_key: image
         flow_threshold: 0.4
         cellprob_threshold: 0.0
