@@ -68,7 +68,7 @@ rule add_cellpose:
         dp=SHAPES_TO_ADD["cellpose"]["dp"],
         gpu_cmd="--gpu" if SHAPES_TO_ADD["cellpose"].get("gpu") else "",
         patch_width=SHAPES_TO_ADD["cellpose"].get("patch_width", None),
-        patch_overlap=SHAPES_TO_ADD["cellpose"].get("patch_overlap", 50),
+        patch_overlap=SHAPES_TO_ADD["cellpose"].get("patch_overlap", None),
         img_key=SHAPES_TO_ADD["cellpose"].get("img_key", "image"),
         flow_thr=SHAPES_TO_ADD["cellpose"].get("flow_threshold", 2),
         pb_thr=SHAPES_TO_ADD["cellpose"].get("cellprob_threshold", -6),
@@ -76,6 +76,17 @@ rule add_cellpose:
         gaussian_sigma=SHAPES_TO_ADD["cellpose"].get("gaussian_sigma", 1),
     shell:
         """
+        if [ {params.patch_width} = None ]; then
+            pwidth_cmd=""
+        else
+            pwidth_cmd="--pwidth {params.patch_width}"
+        fi
+        if [ {params.patch_overlap} = None ]; then
+            povlp_cmd=""
+        else
+            povlp_cmd="--povlp {params.patch_overlap}"
+        fi
+
         chmod +w {params.zarr_dir} {input.zarr_in} {input.zarr_in}/shapes
         python -m spatialhub.scripts.addShapeCellpose \
             --zarr-in {input.zarr_in} \
@@ -84,8 +95,8 @@ rule add_cellpose:
             --mdl-path {params.mdl_path} \
             --dp {params.dp} \
             {params.gpu_cmd} \
-            --pwidth {params.patch_width} \
-            --povlp {params.patch_overlap} \
+            $pwidth_cmd \
+            $povlp_cmd \
             --img-key {params.img_key} \
             --flow-thr {params.flow_thr} \
             --pb-thr {params.pb_thr} \
