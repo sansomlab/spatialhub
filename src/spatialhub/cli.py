@@ -1,4 +1,7 @@
 import subprocess
+import shutil
+
+import yaml
 
 from argparse import ArgumentParser as AP
 from importlib.resources import files
@@ -7,7 +10,10 @@ from spatialhub import __version__
 
 RED = "\033[91m"
 GREEN = "\033[92m"
+YELLOW = "\033[93m"
 RESET = "\033[0m"
+
+PLACEHOLDER_ACCOUNT = "slurm_account"
 
 
 def welcome_message():
@@ -19,6 +25,104 @@ def welcome_message():
     print("Pipelines for Spatial Transcriptomics Analysis.".center(width))
     print("=" * width)
     print()
+
+
+def get_default_slurm_account():
+    """Return the user's default Slurm account, or None if it cannot be determined."""
+    if shutil.which("sacctmgr") is None:
+        return None
+    try:
+        result = subprocess.run(
+            ["sacctmgr", "-nP", "show", "user", "$USER", "format=DefaultAccount"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return None
+    if result.returncode != 0:
+        return None
+    account = result.stdout.strip()
+    return account or None
+
+
+def get_valid_slurm_accounts():
+    """Return the set of accounts the user is associated with, or None if undeterminable."""
+    if shutil.which("sacctmgr") is None:
+        return None
+    try:
+        result = subprocess.run(
+            ["sacctmgr", "-nP", "show", "assoc", "user=$USER", "format=Account"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return None
+    if result.returncode != 0:
+        return None
+    accounts = {line.strip() for line in result.stdout.splitlines() if line.strip()}
+    return accounts or None
+
+
+def _account_error(message):
+    print(f"{RED}[ERROR] {message}{RESET}")
+    default_account = get_default_slurm_account()
+    if default_account:
+        print(
+            f"{YELLOW}[HINT] Your default Slurm account appears to be "
+            f"'{default_account}'. Set 'resources.account' in the workflow "
+            f"config accordingly.{RESET}"
+        )
+    else:
+        print(
+            f"{YELLOW}[HINT] To find your default Slurm account, run:\n"
+            f"           sacctmgr -nP show user $USER format=DefaultAccount{RESET}"
+        )
+    raise SystemExit(1)
+
+
+def validate_config(workflow):
+    """Pre-flight check of the workflow config before Snakemake is invoked.
+
+    Validates that resources.account is set to a real Slurm account rather than
+    the template placeholder, so failures surface here rather than inside a
+    verbose Snakemake/DRMAA traceback.
+    """
+    config_path = Path.cwd().joinpath(f"{workflow}.yaml")
+    if not config_path.exists():
+        print(
+            f"{RED}[ERROR] Config file '{config_path.name}' not found in the "
+            f"current directory. Run '{workflow} config' to create it.{RESET}"
+        )
+        raise SystemExit(1)
+
+    with config_path.open() as fh:
+        config = yaml.safe_load(fh) or {}
+
+    resources = config.get("resources") or {}
+    account = resources.get("account")
+
+    if not account:
+        _account_error(
+            f"No Slurm account set under 'resources.account' in "
+            f"{config_path.name}."
+        )
+
+    if account == PLACEHOLDER_ACCOUNT:
+        _account_error(
+            f"'resources.account' in {config_path.name} is still the template "
+            f"placeholder '{PLACEHOLDER_ACCOUNT}'. Assign a valid Slurm account."
+        )
+
+    valid_accounts = get_valid_slurm_accounts()
+    if valid_accounts is not None and account not in valid_accounts:
+        _account_error(
+            f"Slurm account '{account}' in {config_path.name} is not one of "
+            f"your associated accounts ({', '.join(sorted(valid_accounts))})."
+        )
+
+    print(f"{GREEN}[INFO] Config validated: using Slurm account '{account}'.{RESET}")
 
 
 def copy_config_file(module):
@@ -85,6 +189,7 @@ def main():
     if args.task == "config":
         copy_config_file(args.workflow)
     else:
+        validate_config(args.workflow)
         run_snakemake(
             smkpath,
             args.task,
