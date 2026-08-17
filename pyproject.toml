@@ -21,6 +21,7 @@ dependencies = [
     "rctd-py",
     "sopa[cellpose]",
     "ipykernel",
+    "rich-argparse"
 ]
 requires-python = ">=3.12"
 readme = "README.md"

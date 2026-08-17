@@ -6,6 +6,9 @@ import yaml
 from argparse import ArgumentParser as AP
 from importlib.resources import files
 from pathlib import Path
+
+from rich_argparse import RawDescriptionRichHelpFormatter
+
 from spatialhub import __version__
 
 RED = "\033[91m"
@@ -14,6 +17,62 @@ YELLOW = "\033[93m"
 RESET = "\033[0m"
 
 PLACEHOLDER_ACCOUNT = "slurm_account"
+
+# Single source of truth for available workflows.
+# name -> (one-line summary, [steps])
+WORKFLOWS = {
+    "cosmx_makeZarr": (
+        "Generate one Zarr file per CosMx sample from raw data.",
+        [
+            "With Ashlar: genBlankFOV -> completeGrid -> runAshlar -> makeZarr",
+            "Without Ashlar: assembleFOVs -> makeZarr",
+        ],
+    ),
+    "visiumhd_makeZarr": (
+        "Generate one Zarr file per Visium HD capture area from FASTQ and images.",
+        ["Space Ranger count", "Zarr generation"],
+    ),
+    "visiumhd_prepareBin2Cell": (
+        "Generate intermediate files up to the StarDist step of Bin2Cell.",
+        [],
+    ),
+    "extractH5AD": (
+        "Build an AnnData (H5AD) from a SpatialData (Zarr) when a table already "
+        "exists (typically Visium HD).",
+        [],
+    ),
+    "aggregateH5AD": (
+        "Build an AnnData (H5AD) from a SpatialData (Zarr) when no table exists, "
+        "by aggregating points and shapes (typically CosMx).",
+        [],
+    ),
+    "runRCTD": (
+        "Deconvolve cell-type abundances against a single-cell reference using RCTD.",
+        [],
+    ),
+    "runCell2Location": (
+        "Deconvolve cell-type abundances against a single-cell reference using "
+        "Cell2Location.",
+        [],
+    ),
+}
+
+
+def workflows_help():
+    """Render a compact workflow catalogue for the --help epilog.
+
+    Uses rich markup (interpreted by RawDescriptionRichHelpFormatter). Only the
+    one-line summary is shown per workflow; per-step detail is intentionally
+    omitted here to keep the top-level help scannable.
+    """
+    width = max(len(name) for name in WORKFLOWS)
+    lines = ["[bold]Available workflows:[/]", ""]
+    for name, (summary, _steps) in WORKFLOWS.items():
+        lines.append(f"  [bold cyan]{name:<{width}}[/]  {summary}")
+    lines.append("")
+    lines.append("Run a workflow with:  [bold]spatialhub <workflow> <task>[/]")
+    lines.append("  <task> is one of: config | full | <rulename>")
+    return "\n".join(lines)
 
 
 def welcome_message():
@@ -170,8 +229,17 @@ def main():
     vinfo = f"%(prog)s {__version__}"
 
     # Parse command-line arguments
-    p = AP(description="Pipelines for Spatial Transcriptomics Analysis.")
-    p.add_argument("workflow", help="The workflow to run.")
+    p = AP(
+        description="Pipelines for Spatial Transcriptomics Analysis.",
+        epilog=workflows_help(),
+        formatter_class=RawDescriptionRichHelpFormatter,
+    )
+    p.add_argument(
+        "workflow",
+        choices=WORKFLOWS.keys(),
+        metavar="workflow",
+        help="The workflow to run (see the list below).",
+    )
     p.add_argument("task", help="The task to run, [config|full|<rulename>].")
     p.add_argument("--dry", action="store_true", help="Perform a dry run only.")
     p.add_argument("--cores", default="all", help="Number of cores to use.")
