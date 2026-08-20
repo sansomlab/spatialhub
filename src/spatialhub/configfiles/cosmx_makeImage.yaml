@@ -1,0 +1,42 @@
+resources:
+    account: slurm_account
+    threads: 4
+    mem_mb: 32000
+    time: "4:00:00"
+    partition: "short"
+
+outdir: /path/to/output/directory
+
+# Image/FOV properties
+fov_width: 4256
+fov_height: 4256
+n_channels: 5
+px_size: 0.120280945
+
+# List of channel indices to output from Ashlar alignment.
+# NULL means all channels.
+channels_output: NULL
+
+# Whether to use Ashlar alignment (stitching of FOVs)
+# rather than direct FOV assembly (appending without resolving overlaps at FOV boundaries).
+run_ashlar: true
+
+ashlar:
+    overlap: 0.01
+    max_shift: 15
+    align_channel: 0
+
+slides:
+    slide1:
+        fovpos_csv: /path/to/slide1/fov_positions.csv
+        morph_pfx: /path/to/slide1/Morphology2D/prefix_before_fov_number
+        samples:
+            SS_prox1a: 1,2,3-5
+            SS_dist1a: 1-12
+
+    slide2:
+        fovpos_csv: /path/to/slide2/fov_positions.csv
+        morph_pfx: /path/to/slide2/Morphology2D/prefix_before_fov_number
+        samples:
+            SS_prox1b: 6-6,1-5
+            SS_dist1b: 181-191,32
