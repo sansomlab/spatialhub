@@ -2,6 +2,7 @@ import os
 import spatialdata as spd
 
 from argparse import ArgumentParser as AP
+from pathlib import Path
 from spatialhub.scripts.utils import die, print_arguments, RESET, GREEN
 
 
@@ -38,6 +39,7 @@ def main():
     )["table"]
     centroids = sdata[args.shapes_by].loc[adata.obs_names, "geometry"].centroid
     adata.obs[["array_col", "array_row"]] = [[c.x, c.y] for c in centroids]
+    adata.obs["sample_id"] = Path(args.in_zarr).stem
     adata.layers["counts"] = adata.X.copy()  # Ensure counts layer is present
     adata.write(args.h5adout, compression="gzip")
 
