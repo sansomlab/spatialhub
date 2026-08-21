@@ -37,9 +37,14 @@ def main():
         target_coordinate_system=args.coords,
         deepcopy=True,
     )["table"]
+    
     centroids = sdata[args.shapes_by].loc[adata.obs_names, "geometry"].centroid
     adata.obs[["array_col", "array_row"]] = [[c.x, c.y] for c in centroids]
+    
+    print(Path(args.in_zarr).stem)
     adata.obs["sample_id"] = Path(args.in_zarr).stem
+    print(adata.obs)
+
     adata.layers["counts"] = adata.X.copy()  # Ensure counts layer is present
     adata.write(args.h5adout, compression="gzip")
 
