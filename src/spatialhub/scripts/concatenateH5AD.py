@@ -1,6 +1,9 @@
-from pathlib import Path
-
+import os
 import anndata as ad
+
+from argparse import ArgumentParser as AP
+from pathlib import Path
+from spatialhub.scripts.utils import die, print_arguments, RESET, GREEN
 
 
 def load_matching_h5ads(
@@ -13,6 +16,7 @@ def load_matching_h5ads(
 ) -> ad.AnnData:
     """Load all H5ADs matching a set of required elements for a given sample."""
 
+    h5ad_dir = Path(h5ad_dir)
     if not h5ad_dir.exists():
         raise FileNotFoundError(f"H5AD directory not found: {h5ad_dir}")
     if not h5ad_dir.is_dir():
@@ -108,8 +112,7 @@ def concatenate_adatas(adatas: list[ad.AnnData]) -> ad.AnnData:
 
 
 def main():
-    p = AP(description="Concatenate AnnData objects across the *probe* axis for one sample,"\n,
-                        "segmentation mask (shapes), coordinates system and aggregation function.")
+    p = AP(description="Concatenate AnnData objects across the *probe* axis for one sample, segmentation mask (shapes), coordinates system and aggregation function.")
     p.add_argument("h5adout", help="Path to output h5ad file.")
     p.add_argument("--h5ad_dir", help="Path to input h5ad files.")
     p.add_argument("--sample_id", help="Sample ID for which to concatenate H5AD files.")
@@ -128,6 +131,9 @@ def main():
     )
     args = p.parse_args()
     print_arguments(args)
+
+    if os.path.exists(args.h5adout):
+        raise FileExistsError(f"Output file {args.h5adout} already exists.")
 
     adatas = load_matching_h5ads(
         h5ad_dir=args.h5ad_dir,

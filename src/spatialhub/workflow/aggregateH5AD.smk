@@ -124,12 +124,12 @@ rule concatenate_h5ads:
         h5ad_dir=config["h5ad_dir"]
     shell:
         """
-        python scripts/concatenate_h5ads.py \
+        python -m spatialhub.scripts.concatenateH5AD \
             {output} \
             --h5ad_dir "{params.h5ad_dir}" \
             --sample_id "{wildcards.cap}" \
             --points-from "{params.points_from}" \
-            --shapes-by "{wildcards.shapes}" \
+            --shapes "{wildcards.shapes}" \
             --coords "{wildcards.coords}" \
             --agg-func "{wildcards.agg}" \
             >{log} 2>&1
