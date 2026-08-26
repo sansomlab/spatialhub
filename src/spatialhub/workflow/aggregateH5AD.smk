@@ -108,22 +108,26 @@ rule concatenate_h5ads:
             agg=[wc.agg],
             coords=[wc.coords],
         )
-
     output:
         os.path.join(
             config["h5ad_dir"],
             "{cap}.concat.{shapes}.{agg}.{coords}.h5ad",
         )
-
+    log:
+        os.path.join(
+            config["h5ad_dir"], "aggH5AD.{cap}.concat.{shapes}.{agg}.{coords}.log"
+        ),
+    resources:
+        **RESOURCES,
     params:
-        points_from=config["points_from"]
-
+        points_from=config["points_from"],
+        h5ad_dir=config["h5ad_dir"]
     shell:
         """
         python scripts/concatenate_h5ads.py \
             {output} \
-            {config["h5ad_dir"]} \
-            {wildcards.cap} \
+            --h5ad_dir "{params.h5ad_dir}" \
+            --sample_id "{wildcards.cap}" \
             --points-from "{params.points_from}" \
             --shapes-by "{wildcards.shapes}" \
             --coords "{wildcards.coords}" \
