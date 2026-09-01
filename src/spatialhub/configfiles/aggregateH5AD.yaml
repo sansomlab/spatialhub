@@ -8,7 +8,25 @@ resources:
 zarr_dir: /path/to/directory/containing/zarr/files
 h5ad_dir: /path/to/directory/for/h5ad/files/to/be/created
 
-points_from: main,ctrl
-shapes_by: atomx_segments,cellpose_segments
-agg_func: sum
-coords: global
+bysample_outputs:
+    atomx_counts:
+        points_from: main
+        shapes_by: atomx_segments
+        seg_idx: atomx_index
+        agg_func: sum
+        agg_name: counts
+        coords: global
+    baysor_counts:
+        points_from: main
+        shapes_by: baysor_segments
+        seg_idx: baysor_index
+        agg_func: sum
+        agg_name: counts
+        coords: global
+    cellpose_counts:
+        points_from: main
+        shapes_by: cellpose_segments
+        seg_idx: NULL
+        agg_func: sum
+        agg_name: counts
+        coords: global
