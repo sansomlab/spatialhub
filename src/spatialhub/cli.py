@@ -85,7 +85,7 @@ def welcome_message():
     print()
     print("=" * width)
     print(f"Welcome to SpatialHub (v{__version__})!".center(width))
-    print("Pipelines for Spatial Transcriptomics Analysis.".center(width))
+    print("Workflows for Spatial Transcriptomics Analysis.".center(width))
     print("=" * width)
     print()
 
@@ -234,7 +234,7 @@ def main():
 
     # Parse command-line arguments
     p = AP(
-        description="Pipelines for Spatial Transcriptomics Analysis.",
+        description="Workflows for Spatial Transcriptomics Analysis.",
         epilog=workflows_help(),
         formatter_class=RawDescriptionRichHelpFormatter,
     )
