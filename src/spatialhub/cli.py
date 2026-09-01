@@ -21,12 +21,16 @@ PLACEHOLDER_ACCOUNT = "slurm_account"
 # Single source of truth for available workflows.
 # name -> (one-line summary, [steps])
 WORKFLOWS = {
-    "cosmx_makeZarr": (
-        "Generate one Zarr file per CosMx sample from raw data.",
+    "cosmx_makeImage": (
+        "Generate one image file per CosMx sample from raw FOV data.",
         [
-            "With Ashlar: genBlankFOV -> completeGrid -> runAshlar -> makeZarr",
-            "Without Ashlar: assembleFOVs -> makeZarr",
+            "with Ashlar (stitching FOVs): genBlankFOV -> completeGrid -> runAshlar",
+            "without Ashlar (appending FOVs without resolving overlaps at boundaries): assembleFOVs",
         ],
+    ),
+    "cosmx_makeZarr": (
+        "Generate one Zarr file per CosMx sample from compiled image and raw transcripts data.",
+        [],
     ),
     "visiumhd_makeZarr": (
         "Generate one Zarr file per Visium HD capture area from FASTQ and images.",
