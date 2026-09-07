@@ -1,0 +1,26 @@
+resources:
+    account: slurm_account
+    threads: 16
+    mem_mb: 64000
+    time: "01:00:00"
+    slurm_partition: short
+
+h5ad_dir: /path/to/directory/containing/h5ad_or_rds.dir 
+    # param named h5ad_dir to reflect spatialhub in/out workflow,
+    # but SingleCellExperiment objects are also supported.
+
+
+# Regex pattern to use for finding background (negative) and positive control probes in the panel.
+background: Negative
+poscontrol: System
+
+# Path to a custom panel file (CSV) listing the added custom probes.
+# Leave blank if no custom panel was used.
+custom_panel_file: /path/to/custom/panel.csv
+
+# Bruker FOV QC settings, if applicable (CosMx dataset)
+# with paths to code and data not distributed within spatialhub (maintained by Bruker)
+# https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/FOV%20QC
+runBrukerFOVqc: false
+bruker_code:
+bruker_data:
