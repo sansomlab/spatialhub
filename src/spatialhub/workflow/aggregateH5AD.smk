@@ -19,11 +19,17 @@ CAPTURE_IDS = [
     if cap.endswith(".zarr")
 ]
 
+# Points elements used to generate individual and concatenated H5ADs (if applicable)
+POINTS_LIST = list(map(str.strip, config["points_from"].split(",")))
+POINTS_LABEL = "+".join(POINTS_LIST)
+
+
 if config["concat"]:
     FULL_TARGETS = expand(
         os.path.join(
             config["h5ad_dir"],
-            "{cap}.concat.{shapes}.{agg}.{coords}.h5ad",
+            f"{POINTS_LABEL}.{{shapes}}.{{agg}}.{{coords}}",
+            "{cap}.h5ad",
         ),
         cap=CAPTURE_IDS,
         shapes=map(str.strip, config["shapes_by"].split(",")),
@@ -34,7 +40,8 @@ else:
     FULL_TARGETS = expand(
         os.path.join(
             config["h5ad_dir"],
-            "{cap}.{points}.{shapes}.{agg}.{coords}.h5ad",
+            "{points}.{shapes}.{agg}.{coords}",
+            "{cap}.h5ad",
         ),
         cap=CAPTURE_IDS,
         points=map(str.strip, config["points_from"].split(",")),
@@ -69,10 +76,16 @@ rule make_h5ad:
     input:
         os.path.join(config["zarr_dir"], "{cap}.zarr"),
     output:
-        os.path.join(config["h5ad_dir"], "{cap}.{points}.{shapes}.{agg}.{coords}.h5ad"),
+        os.path.join(
+            config["h5ad_dir"],
+            "{points}.{shapes}.{agg}.{coords}",
+            "{cap}.h5ad",
+        ),
     log:
         os.path.join(
-            config["h5ad_dir"], "aggH5AD.{cap}.{points}.{shapes}.{agg}.{coords}.log"
+            config["h5ad_dir"],
+            "{points}.{shapes}.{agg}.{coords}",
+            "aggH5AD.{cap}.log",
         ),
     resources:
         **RESOURCES,
@@ -81,7 +94,7 @@ rule make_h5ad:
         points="{points}",
         shapes="{shapes}",
         agg="{agg}",
-        coords=config["coords"],
+        coords="{coords}",
     shell:
         """
         python -m spatialhub.scripts.aggregateH5AD \
@@ -100,22 +113,26 @@ rule concatenate_h5ads:
         lambda wc: expand(
             os.path.join(
                 config["h5ad_dir"],
-                "{cap}.{points}.{shapes}.{agg}.{coords}.h5ad",
+                "{points}.{shapes}.{agg}.{coords}",
+                "{cap}.h5ad",
             ),
             cap=[wc.cap],
-            points=map(str.strip, config["points_from"].split(",")),
+            points=POINTS_LIST,
             shapes=[wc.shapes],
             agg=[wc.agg],
             coords=[wc.coords],
-        )
+        ),
     output:
         os.path.join(
             config["h5ad_dir"],
-            "{cap}.concat.{shapes}.{agg}.{coords}.h5ad",
-        )
+            f"{POINTS_LABEL}.{{shapes}}.{{agg}}.{{coords}}",
+            "{cap}.h5ad",
+        ),
     log:
         os.path.join(
-            config["h5ad_dir"], "aggH5AD.{cap}.concat.{shapes}.{agg}.{coords}.log"
+            config["h5ad_dir"],
+            f"{POINTS_LABEL}.{{shapes}}.{{agg}}.{{coords}}",
+            "aggH5AD.{cap}.log",
         ),
     resources:
         **RESOURCES,
