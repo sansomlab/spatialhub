@@ -290,6 +290,10 @@ PROBEQC_OUTPUTS = [
         str(RUN_DIR),
         "{sample}_cellQCmetrics.csv",
     ),
+    os.path.join(
+        str(RUN_DIR),
+        "{sample}_cellMetadata.csv",
+    ),
 ]
 
 if RUN_BRUKER_FOV_QC:
@@ -362,3 +366,6 @@ rule probeQC:
             {params.bruker_qc} \
             >"{log}" 2>&1
         """
+
+
+# Add rule to flag cell failing QC - based on user-defined thresholds

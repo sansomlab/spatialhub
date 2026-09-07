@@ -194,7 +194,7 @@ if (all(rownames(df) == colnames(counts_mat))) {
 }
 
 
-# Save cell-level QC metrics
+# Save cell-level QC metrics and sce metadata (avoids re-loading the entire dataset later)
 print("Saving cell-level QC metrics:")
 df <- df |>
   dplyr::mutate(instance_id = rownames(df),
@@ -202,6 +202,8 @@ df <- df |>
 head(df)
 write.csv(df, row.names = FALSE, quote = FALSE, 
           file = paste0(opt$outdir, "/", pathStem, "_cellQCmetrics.csv"))
+write.csv(as.data.frame(colData(sce)), row.names = FALSE, quote = FALSE, 
+          file = paste0(opt$outdir, "/", pathStem, "_cellMetadata.csv"))
 
 
 
