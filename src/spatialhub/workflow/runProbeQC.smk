@@ -52,15 +52,22 @@ RESOURCES = {
 RESOURCES.update(config.get("resources", {}))
 
 # R script distributed with the spatialhub package
-PROBEQC_SCRIPT = files("spatialhub").joinpath(
+PROBEQC_MTX_SCRIPT = files("spatialhub").joinpath(
     "scripts",
     "calculateQC_fromCountsMatrix.R",
 )
+PROBEQC_DERIVED_SCRIPT = files("spatialhub").joinpath(
+    "scripts",
+    "calculateQC_derivedVariables.R",
+)
 
-if config.get("runBrukerFOVqc", False):
+RUN_BRUKER_QC = config.get("run_bruker_qc", False)
+RUN_FOV_QC = config.get("run_fov_qc", False)
+
+if RUN_BRUKER_QC:
     if not config.get("bruker_code") or not config.get("bruker_data"):
         raise ValueError(
-            "runBrukerFOVqc is enabled but bruker_code and/or bruker_data "
+            "run_bruker_qc is enabled but bruker_code and/or bruker_data "
             "are not specified."
         )
 
@@ -255,7 +262,7 @@ if INPUT_FORMAT == "h5ad":
         raise ValueError(
             "Input H5ADs do not contain "
             "adata.uns['counts_mtx_source'] metadata. "
-            "Specify 'run_name' in probeQC.yaml."
+            "Specify 'run_name' in runProbeQC.yaml."
         )
 
 else:
@@ -263,7 +270,7 @@ else:
     # so the run directory must be named explicitly.
     if not RUN_NAME_OVERRIDE:
         raise ValueError(
-            "run_name must be specified in probeQC.yaml "
+            "run_name must be specified in runProbeQC.yaml "
             "when using RDS input."
         )
 
@@ -283,9 +290,7 @@ print(f"ProbeQC output directory: {RUN_DIR}")
 # Define output
 # ----------------------------------------------------------------------
 
-RUN_BRUKER_FOV_QC = config.get("runBrukerFOVqc", False)
-
-PROBEQC_OUTPUTS = [
+MTXQC_OUTPUTS = [
     os.path.join(
         str(RUN_DIR),
         "{sample}_cellQCmetrics.csv",
@@ -294,22 +299,44 @@ PROBEQC_OUTPUTS = [
         str(RUN_DIR),
         "{sample}_cellMetadata.csv",
     ),
+    os.path.join(
+        str(RUN_DIR),
+        "{sample}_probeClassifier.csv",
+    ),
 ]
 
-if RUN_BRUKER_FOV_QC:
-    PROBEQC_OUTPUTS.extend(
+if RUN_BRUKER_QC:
+    MTXQC_OUTPUTS.extend(
         [
             os.path.join(
                 str(RUN_DIR),
-                "{sample}_fovQCmetrics.csv",
-            ),
-            os.path.join(
-                str(RUN_DIR),
-                "{sample}_instrGeneBias.csv",
+                "{sample}_brukerQCresults.csv",
             ),
         ]
     )
 
+
+DERIVEDQC_OUTPUTS = [
+    os.path.join(
+        str(RUN_DIR),
+        "{sample}_sampleQCmetrics.csv",
+    ),
+]
+
+if RUN_FOV_QC:
+    DERIVEDQC_OUTPUTS.extend(
+        [
+           os.path.join(
+                str(RUN_DIR),
+                "{sample}_fovQCmetrics.csv",
+            ) 
+        ]
+    )
+
+
+FULL_TARGETS = list(
+    dict.fromkeys(MTXQC_OUTPUTS + DERIVEDQC_OUTPUTS)
+)
 
 
 # ----------------------------------------------------------------------
@@ -318,22 +345,31 @@ if RUN_BRUKER_FOV_QC:
 
 rule full:
     input:
-        expand(
-            PROBEQC_OUTPUTS,
-            sample=SAMPLES,
-        )
+        expand(FULL_TARGETS, sample=SAMPLES,),
+    resources:
+        **RESOURCES,
+    params:
+        lock=LOCK,
+        probeqcdir=RUN_DIR,
+    shell:
+        """
+        if [ {params.lock} = true ]; then
+            chmod -R a-w {params.probeqcdir}
+        fi
+        echo "=======> All done! <======="
+        """
 
 
-rule probeQC:
+rule probeQC_mtx:
     input:
         lambda wc: INPUT_BY_SAMPLE[wc.sample],
     output:
-        PROBEQC_OUTPUTS,
+        MTXQC_OUTPUTS,
     log:
         os.path.join(
             str(RUN_DIR),
             "logs",
-            "{sample}.probeQC.log",
+            "{sample}.probeQC_mtx.log",
         ),
     resources:
         **RESOURCES,
@@ -350,14 +386,14 @@ rule probeQC:
             f'--runBrukerFOVqc TRUE '
             f'--brukerCodeFile "{config["bruker_code"]}" '
             f'--brukerDataFile "{config["bruker_data"]}"'
-            if config.get("runBrukerFOVqc", False)
+            if RUN_BRUKER_QC
             else ""
         ),
     shell:
         """
         mkdir -p "{RUN_DIR}" "$(dirname "{log}")"
 
-        Rscript "{PROBEQC_SCRIPT}" \
+        Rscript "{PROBEQC_MTX_SCRIPT}" \
             --path2sce "{input}" \
             --outdir "{RUN_DIR}" \
             --background "{params.background}" \
@@ -368,4 +404,39 @@ rule probeQC:
         """
 
 
-# Add rule to flag cell failing QC - based on user-defined thresholds
+rule probeQC_derived:
+    input:
+        lambda wc: expand(
+            MTXQC_OUTPUTS,
+            sample=[wc.sample],
+        ),
+    output:
+        DERIVEDQC_OUTPUTS,
+    log:
+        os.path.join(
+            str(RUN_DIR),
+            "logs",
+            "{sample}.probeQC_derived.log",
+        )
+    resources:
+        **RESOURCES,
+    params:
+        sample_id=lambda wc: wc.sample,
+        run_dir=str(RUN_DIR),
+        run_fov_qc=lambda wc: (
+            "TRUE"
+            if RUN_FOV_QC
+            else "FALSE"
+        )
+    shell:
+        """
+        mkdir -p "$(dirname "{log}")"
+
+        Rscript "{PROBEQC_DERIVED_SCRIPT}" \
+            --sample_id "{params.sample_id}" \
+            --run_dir "{params.run_dir}" \
+            --runFOVqc "{params.run_fov_qc}" \
+            >"{log}" 2>&1
+        """
+
+# Next: Add separate rule to flag cell failing QC based on user-defined thresholds

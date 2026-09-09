@@ -18,9 +18,12 @@ poscontrol: System
 # Leave blank if no custom panel was used.
 custom_panel_file: /path/to/custom/panel.csv
 
-# Bruker FOV QC settings, if applicable (CosMx dataset)
+# Should FOV QC be run on that sample? (CosMx dataset - TBC Xenium)
+run_fov_qc: false
+
+# *Bruker* FOV QC settings, if applicable (CosMx dataset)
 # with paths to code and data not distributed within spatialhub (maintained by Bruker)
 # https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/FOV%20QC
-runBrukerFOVqc: false
+run_bruker_qc: false
 bruker_code:
 bruker_data:

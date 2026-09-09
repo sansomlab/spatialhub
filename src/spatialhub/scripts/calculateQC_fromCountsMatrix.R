@@ -119,6 +119,14 @@ if (nchar(opt$customPanel) > 0) {
 }
 
 
+### Initiate probe classifier
+
+probe_class <- data.frame(probe_name = rownames(counts_mat), 
+                          negative = grepl(opt$background, rownames(counts_mat)),
+                          positive = grepl(opt$poscontrol, rownames(counts_mat)))
+#tail(probe_class)
+
+
 
 
 # ---------- Task 1: Calculate cell-level QC metrics ----------
@@ -136,7 +144,6 @@ counts_neg <- counts_mat[grep(opt$background, rownames(counts_mat)), ]
 print(paste0("Number of negative control probes: ", dim(counts_neg)[1]))
 rownames(counts_neg)
 negc <- colSums(counts_neg) |> data.frame(); names(negc) <- "nCount_neg"
-n_neg <- nrow(counts_neg)  # storing for later
 
 # system/positive (control) probes only
 counts_sys <- counts_mat[grep(opt$poscontrol, rownames(counts_mat)), ]
@@ -145,11 +152,14 @@ rownames(counts_sys) |> head(n = 30)
 sysc <- colSums(counts_sys) |> data.frame(); names(sysc) <- "nCount_sys"
 
 
-# list of probes that do not belong to the universal panel
+# define and derive counts for probes that do not belong to the universal panel
 non_ucc_probes <- c(rownames(counts_neg), rownames(counts_sys))
 
 if (nchar(opt$customPanel) > 0) {
   
+  # update probe classifier
+  probe_class$custom <- (rownames(counts_mat) %in% custom_probes$probe_name)
+
   # custom probes (add-on panel) only
   counts_add <- counts_mat[rownames(counts_mat) %in% custom_probes$probe_name, ]
   print(paste0("Number of additional probes in custom panel: ", dim(counts_add)[1]))
@@ -160,10 +170,10 @@ if (nchar(opt$customPanel) > 0) {
   non_ucc_probes <- c(non_ucc_probes, rownames(counts_add))
   
 }
+probe_class$ucc <- !as.logical(rowSums(probe_class[, 2:ncol(probe_class)]))
 
-# standard probes (universal panel) only
+# finally, derive counts for standard probes (universal panel) only
 counts_ucc <- counts_mat[!(rownames(counts_mat) %in% non_ucc_probes), ]
-default_probes <- rownames(counts_mat)
 print(paste0("Number of probes in universal characterization panel: ", dim(counts_ucc)[1]))
 uccc <- colSums(counts_ucc) |> data.frame(); names(uccc) <- "nCount_ucc"
 uccf <- colSums(counts_ucc > 0) |> data.frame(); names(uccf) <- "nFeature_ucc"
@@ -188,13 +198,25 @@ if (nchar(opt$customPanel) > 0) {
 
 # Compute nCount for a random subset of probes (can help to spot FOVs with lower signal)
 if (all(rownames(df) == colnames(counts_mat))) {
-  df$nCount_rand20 <- colSums(counts_mat[sample(default_probes)[1:20], ])
+  df$nCount_rand20 <- colSums(counts_mat[sample(rownames(counts_mat))[1:20], ])
 } else {
   stop("rownames mismatch!")
 }
 
+# NOTE: although the next 2 variables could be derived from previous summary metrics
+# (without re-loading the counts matrix), we will calculate them in this script to streamline outputs
+# (i.e. to gather all *cell* QC metrics in one CSV file)
 
-# Save cell-level QC metrics and sce metadata (avoids re-loading the entire dataset later)
+# Proportion of negative (does not consider system control probes)
+df$percentNegCounts <- (df$nCount_neg / (df$nCount_RNA + df$nCount_neg)) * 100 
+
+# "complexity" (transcripts per detected probe)
+df$complexity <- df$nCount_RNA / df$nFeature_RNA
+
+
+
+
+# Save cell-level QC metrics and metadata (avoids re-loading the entire dataset later)
 print("Saving cell-level QC metrics:")
 df <- df |>
   dplyr::mutate(instance_id = rownames(df),
@@ -204,6 +226,8 @@ write.csv(df, row.names = FALSE, quote = FALSE,
           file = paste0(opt$outdir, "/", pathStem, "_cellQCmetrics.csv"))
 write.csv(as.data.frame(colData(sce)), row.names = FALSE, quote = FALSE, 
           file = paste0(opt$outdir, "/", pathStem, "_cellMetadata.csv"))
+write.csv(probe_class, row.names = FALSE, quote = FALSE, 
+          file = paste0(opt$outdir, "/", pathStem, "_probeClassifier.csv"))
 
 
 
@@ -274,16 +298,22 @@ if (opt$runBrukerFOVqc) {
   # Select barcodes corresponding to universal (UCC) panel used in the study
   ovlp <- c()
   for (i in 1:length(all_panels)) {
-    v <- sum(default_probes %in% all_panels[[i]]$gene) / length(all_panels[[i]]$gene)
+    v <- sum(probe_class$probe_name[probe_class$ucc] %in% all_panels[[i]]$gene) / length(all_panels[[i]]$gene)
     ovlp <- c(ovlp, v)
   }
   stopifnot("Limited overlap between study panel and Bruker default probes. Check probe names were correctly imported." = max(ovlp) > 0.8)
   idx <- which(ovlp == max(ovlp))
   barcodes <- all_panels[[idx]]
-  barcodes <- barcodes[barcodes$gene %in% default_probes, ]
+  barcodes <- barcodes[barcodes$gene %in% probe_class$probe_name[probe_class$ucc], ]
   
   
   ### Ready to run!
+  
+  # Initialize a summary table where to save output
+  dfov <- as.data.frame(colData(sce)[, c("sample_id", "FOV")])
+  dfov$FOV <- as.numeric(as.character(dfov$FOV))
+  dfov <- dfov[!duplicated(dfov), ] |> dplyr::arrange(FOV)
+  rownames(dfov) <- 1:nrow(dfov)
   
   print(paste0("Checking FOV instrument failures for sample ", pathStem))
   res_fov_qc <- runFOVQC(counts = t(assay(sce)), 
@@ -292,7 +322,7 @@ if (opt$runBrukerFOVqc) {
                          barcodemap = barcodes,  # REMINDER: this only considers probes in the custom panel (including Negative)
                          max_prop_loss = 0.6, max_totalcounts_loss = 0.6)  # default 0.6, the higher, the more relaxed the QC
   #summary(res_fov_qc)
-  
+
   # Extract and save list of affected genes
   dfg <- res_fov_qc$flagged_fov_x_gene |> data.frame()
   #dfg <- dfg[!duplicated(dfg), ]
@@ -302,42 +332,29 @@ if (opt$runBrukerFOVqc) {
     
     dfg$count <- 1
     dfg <- aggregate.data.frame(dfg, . ~ fov + gene, FUN = "sum")
-    names(dfg) <- c("fov", "gene", "failed_cycles")
-    #dfg$sample_id <- sample
-    
+    names(dfg) <- c("FOV", "gene", "failed_cycles")
+    dfg$FOV <- as.numeric(as.character(dfg$FOV))
+
     dfg <- dfg |>
       dplyr::arrange(gene) |>
       dplyr::arrange(desc(failed_cycles)) |>
       dplyr::arrange(fov)
-    
-    dfg <- dfg |>
-      dplyr::mutate(sample_id = as.character(colData(sce)$sample_id[1]),
-                   .before = fov)
 
-  } else {
-    # creating empty output to save in order to validate snakemake rule full
-    dfg <- data.frame(sample_id = as.character(colData(sce)$sample_id[1]),
-                      fov = NA, gene = NA, failed_cycles = NA)
+    dfov <- plyr::join(fov, dfg, by = "FOV", type = "full")
+
+    # Compute fraction of failed genes per FOV
+    #dfract <- data.frame(table(dfg$fov) / nrow(barcodes))
+    #names(dfract) <- c("FOV", "fraction_genes_bias")
+    #dfract$FOV <- as.numeric(as.character(dfract$FOV))
+      ## WARNING: unclear how a FOV can fail for gene bias but have no gene flagged as biased?!
+  
   }
-  write.csv(dfg, row.names = FALSE, quote = FALSE, 
-            file = paste0(opt$outdir, "/", pathStem, "_instrGeneBias.csv"))
   
-  # Compute fraction of failed genes per FOV
-  #dfract <- data.frame(table(dfg$fov) / nrow(barcodes))
-  #names(dfract) <- c("FOV", "fraction_genes_bias")
-  #dfract$FOV <- as.numeric(as.character(dfract$FOV))
-  
-  # Create summary table and save output
-  dfov <- as.data.frame(colData(sce)[, c("sample_id", "FOV")])
-  dfov$FOV <- as.numeric(as.character(dfov$FOV))
-  dfov <- dfov[!duplicated(dfov), ] |> dplyr::arrange(FOV)
-  rownames(dfov) <- 1:nrow(dfov)
   dfov$qcFlagInstr <- ifelse(dfov$FOV %in% res_fov_qc$flaggedfovs, "Fail", "Pass")
   dfov$qcFlagGeneBias <- ifelse(dfov$FOV %in% res_fov_qc$flaggedfovs_forbias, "Fail", "Pass")
-  #dfov <- dfov |> dplyr::left_join(dfract, by = dplyr::join_by(FOV))
-    ## WARNING: unclear how a FOV can fail for gene bias but have no gene flagged as biased?!
+    
   write.csv(dfov, row.names = FALSE, quote = FALSE, 
-            file = paste0(opt$outdir, "/", pathStem, "_fovQCmetrics.csv"))
+            file = paste0(opt$outdir, "/", pathStem, "_brukerQCresults.csv"))
 
   print(paste0("Bruker FOV QC completed for sample ", pathStem))
   
