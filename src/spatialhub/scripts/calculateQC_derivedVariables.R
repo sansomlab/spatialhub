@@ -134,7 +134,7 @@ if (opt$runFOVqc) {
   fovQC_file <- paste0(opt$run_dir, "/", opt$sample_id, "_brukerQCresults.csv")
   if(file.exists(fovQC_file)) {
     dfov0 <- read.csv(fovQC_file, header = TRUE)
-    dfov0 <- dfov0 |> dplyr::select(-gene, -failed_cycles)
+    #dfov0 <- dfov0 |> dplyr::select(-gene, -failed_cycles)
     dfov0 <- dfov0[!duplicated(dfov0), ] |> dplyr::arrange(FOV)
     dfov <- plyr::join(dfov, dfov0, by = "FOV") |>
       dplyr::relocate(sample_id, .before = FOV)

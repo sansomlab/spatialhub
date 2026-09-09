@@ -369,6 +369,7 @@ v <- rowSums(counts_mat) |> sort(decreasing = TRUE)
 v10 <- v[-grep(opt$poscontrol, names(v))] |> head(n = 10)
 print("Top most detected probes in this sample (excluding positive controls): ")
 v10
+# could make the probe classifier df sorted by most to least detected probes (since we save one per sample)
 
 u <- rowSums(counts_mat) |> sort(decreasing = FALSE)
 u10 <- u[-grep(opt$poscontrol, names(u))] |> head(n = 10)
