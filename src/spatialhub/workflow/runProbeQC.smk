@@ -15,7 +15,9 @@ Inputs
 
 Outputs
 -------
-- CSV tables of QC metrics
+- CSV tables of QC metrics and flags per sample
+- Enriched cell-level metadata table for the project, including QC metrics and sample-level metadata relevant for the study
+- HTML QC reports and underlying Rmd files for the user to further amend manually
 """
 
 import os
@@ -178,7 +180,7 @@ def format_points_from(value):
 
 def read_counts_mtx_config(path):
     """
-    Read the aggregation configuration (i.e. source Points elements, segementation mask, etc.)
+    Read the aggregation configuration (i.e. source Points elements, segmentation mask, etc.)
     from an H5AD AnnData table generated with `spatialhub`.
     """
 
