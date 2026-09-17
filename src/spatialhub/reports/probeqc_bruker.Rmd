@@ -1,0 +1,63 @@
+
+## Per-sample instrument failures {.tabset}
+
+`spatialhub` enables to run a FOV QC tool from Bruker Spatial Biology, Inc. to check for instrument failures. **For additional FOV-level QC options from the company, see also [NanoString blog](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/)**
+
+
+### Any instrument failure
+
+This may notably include low average `nCount_RNA` per cell, and is thus redundant with the above.
+
+```{r instr_failure, fig.height=12L}
+spx_meta$qcFlagInstr <- factor(as.character(spx_meta$qcFlagInstr), levels = c("Pass", "Fail"))
+
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    ggplot(aes(x = CenterX_composite, y = CenterY_composite, color = qcFlagInstr)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_manual(values = c("grey70", "red2")) +
+    theme(legend.position = "none") +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed()
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+* * *
+* * *
+* * *
+
+### Failure introducing gene bias
+
+The flagged FOVs were affected by instrument failures that did not affect all genes equally, which may lead to biases in downstream analyses.
+
+```{r gene_bias, fig.height=12L}
+spx_meta$qcFlagGeneBias <- factor(as.character(spx_meta$qcFlagGeneBias), levels = c("Pass", "Fail"))
+
+gg_slide <- list()
+for (slide in sort(unique(spx_meta$slide_id))) {
+
+  g <- spx_meta |>
+    dplyr::filter(slide_id == slide) |>  
+    ggplot(aes(x = CenterX_composite, y = CenterY_composite, color = qcFlagGeneBias)) +
+    geom_point(size = 0.1) + theme_classic(base_size = font_size) +
+    scale_color_manual(values = c("grey70", "red2")) +
+    theme(legend.position = "none") +
+    ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
+    coord_fixed()
+
+  gg_slide[[slide]] <- g
+  
+}
+do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
+```
+
+* * *
+* * *
+* * *

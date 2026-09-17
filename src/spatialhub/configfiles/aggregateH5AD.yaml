@@ -8,7 +8,11 @@ resources:
 zarr_dir: /path/to/directory/containing/zarr/files
 h5ad_dir: /path/to/directory/for/h5ad/files/to/be/created
 
-points_from: main,ctrl
-shapes_by: atomx_segments,cellpose_segments
-agg_func: sum
+# Which elements from the Zarr stack should be used to derive the counts matrix?
+points_from: main,ctrl  # transcripts table - main (e.g. UCC panel and relevant custom probes), control..
+shapes_by: atomx_segments,cellpose_segments  # which segmentation mask(s) to use
 coords: global
+
+# How should the counts matrix be aggregated?
+agg_func: sum  # Options: sum, mean, median, max, min
+concat: true  # whether to merge points back into one single counts matrix (useful for QC, but likely not for analyses)
