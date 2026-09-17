@@ -128,6 +128,31 @@ probe_class <- data.frame(probe_name = rownames(counts_mat),
 
 
 
+# ---------- Task 0: Enrich cell-level metadata if necessary ----------
+
+print("Retrieving and validating essential cell-level metadata from H5AD object.")
+
+if (!("x" %in% names(colData(sce))) | !("y" %in% names(colData(sce)))) {
+  # If no x/y coordinate found in metadata
+  if ("array_row" %in% names(colData(sce))) {
+    # => check for synonyms for H5AD derived using SpatialHub
+    col_idx <- which(names(colData(sce)) == "array_row")
+    names(colData(sce))[col_idx] <- "x"
+    col_idy <- which(names(colData(sce)) == "array_col")
+    names(colData(sce))[col_idy] <- "y"
+  } else if ("CenterX_global_px" %in% names(colData(sce))) {
+    # => check for synonyms for H5AD derived directly from AtoMx flat files
+    col_idx <- which(names(colData(sce)) == "CenterX_global_px")
+    names(colData(sce))[col_idx] <- "x"
+    col_idy <- which(names(colData(sce)) == "CenterY_global_px")
+    names(colData(sce))[col_idy] <- "y"
+  } else {
+    stop("x/y coordinates not found in metadata. These will be essential for downstream plots.")
+  }
+}
+
+
+
 
 # ---------- Task 1: Calculate cell-level QC metrics ----------
 
@@ -224,10 +249,6 @@ df <- df |>
 head(df)
 write.csv(df, row.names = FALSE, quote = FALSE, 
           file = paste0(opt$outdir, "/", pathStem, "_cellQCmetrics.csv"))
-write.csv(as.data.frame(colData(sce)), row.names = FALSE, quote = FALSE, 
-          file = paste0(opt$outdir, "/", pathStem, "_cellMetadata.csv"))
-write.csv(probe_class, row.names = FALSE, quote = FALSE, 
-          file = paste0(opt$outdir, "/", pathStem, "_probeClassifier.csv"))
 
 
 
@@ -243,27 +264,7 @@ if (opt$runBrukerFOVqc) {
   ### Pre-flight checks
   
   stopifnot(require(FNN))
-  
-  if (!("x" %in% names(colData(sce))) | !("y" %in% names(colData(sce)))) {
     
-    # If no x/y coordinate found in metadata
-    if ("array_row" %in% names(colData(sce))) {
-      # => check for synonyms for H5AD derived using SpatialHub
-      col_idx <- which(names(colData(sce)) == "array_row")
-      names(colData(sce))[col_idx] <- "x"
-      col_idy <- which(names(colData(sce)) == "array_col")
-      names(colData(sce))[col_idy] <- "y"
-    } else if ("CenterX_global_px" %in% names(colData(sce))) {
-      # => check for synonyms for H5AD derived directly from AtoMx flat files
-      col_idx <- which(names(colData(sce)) == "CenterX_global_px")
-      names(colData(sce))[col_idx] <- "x"
-      col_idy <- which(names(colData(sce)) == "CenterY_global_px")
-      names(colData(sce))[col_idy] <- "y"
-    } else {
-      stop("cannot run Bruker FOV QC: x/y coordinates not found in metadata")
-    }
-  }
-  
   if (!("FOV" %in% names(colData(sce)))) {
     
     # If no 'FOV' variable is present in the metadata
@@ -285,7 +286,7 @@ if (opt$runBrukerFOVqc) {
     }
     
   }
-  
+   
   # Source functions and barcodes from Bruker Spatial Biology:
   # https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/FOV%20QC
   if (!file.exists(opt$brukerCode)) {
@@ -365,16 +366,25 @@ if (opt$runBrukerFOVqc) {
 
 # ---------- Task 3: Find top and least expressed genes ----------
 
-v <- rowSums(counts_mat) |> sort(decreasing = TRUE)
-v10 <- v[-grep(opt$poscontrol, names(v))] |> head(n = 10)
-print("Top most detected probes in this sample (excluding positive controls): ")
-v10
-# could make the probe classifier df sorted by most to least detected probes (since we save one per sample)
+if (all(rownames(counts_mat) == probe_class$probe_name)) {
+  print("Adding summary statistics for each probe in the counts matrix to probe classifier table")
+  probe_class <- probe_class |> 
+    dplyr::mutate(nCells_detected = rowSums(counts_mat > 0)) |>
+    dplyr::mutate(fractCells_detected = nCells_detected / ncol(counts_mat)) |>
+    dplyr::mutate(nCount_total = rowSums(counts_mat)) |>
+    dplyr::arrange(desc(nCount_total)) |>
+    dplyr::mutate(nCount_rank = 1:nrow(probe_class)) |>
+    dplyr::arrange(probe_name)
+} else {
+  stop("The probe classifier list and matrix row names do not match.")
+}
+write.csv(probe_class, row.names = FALSE, quote = FALSE, 
+          file = paste0(opt$outdir, "/", pathStem, "_probeClassifier.csv"))
 
-u <- rowSums(counts_mat) |> sort(decreasing = FALSE)
-u10 <- u[-grep(opt$poscontrol, names(u))] |> head(n = 10)
-print("Least detected probes in this sample (excluding positive controls): ")
-u10
+
+# Write cell-level metadata
+write.csv(as.data.frame(colData(sce)), row.names = FALSE, quote = FALSE, 
+          file = paste0(opt$outdir, "/", pathStem, "_cellMetadata.csv"))
 
 
 
