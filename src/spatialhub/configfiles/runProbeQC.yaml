@@ -1,0 +1,47 @@
+resources:
+    account: slurm_account
+    threads: 16
+    mem_mb: 64000
+    time: "01:00:00"
+    slurm_partition: short
+
+h5ad_dir: /path/to/directory/containing/h5ad_or_rds.dir 
+    # param named h5ad_dir to reflect spatialhub in/out workflow,
+    # but SingleCellExperiment objects are also supported.
+metadata_file: /path/to/file/containing/sample-level/metadata.csv
+    # minimally, this table must include 'sample_id' (matching the one used to name per-sample H5AD files)
+    # 'slide_id' (even if a single slide was analyzed).
+    # Optional variables include condition, and any other experimental metadata.
+
+
+# Regex pattern to use for finding background (negative) and positive control probes in the panel.
+background: Negative
+poscontrol: System
+
+# Path to a custom panel file (CSV) listing the added custom probes.
+# Leave blank if no custom panel was used.
+custom_panel_file: /path/to/custom/panel.csv
+
+# Should FOV QC be run on that sample? (CosMx dataset - TBC Xenium)
+run_fov_qc: false
+
+# *Bruker* FOV QC settings, if applicable (CosMx dataset)
+# with paths to code and data not distributed within spatialhub (maintained by Bruker)
+# https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/FOV%20QC
+run_bruker_qc: false
+bruker_code:
+bruker_data:
+
+
+# Fetch YAML of thresholds for pass/fail QC (iterative thresholding and review of QC reports)
+qc_thresh: /path/to/probeqc_thresholds.yaml
+qc_outdir: current  # will appear under probeqc.dir/qc/<qc_thresh_outdir>/
+
+# Plotting parameters for reports (ggplot2)
+group: condition        # parameter to facet plot by
+composite_ncol: 2       # number of columns (i.e. samples per row) of the composite slide
+composite_spacing: 500  # number of pixels to leave blank between 2 adjacent samples in the composite slide
+plot_ncol_spatial: 4    # number of columns in figure panels for spatial plots
+plot_ncol: 2            # number of columns in figure panels for other plots (e.g. distributions)
+font_size: 10
+legend_size: 3
