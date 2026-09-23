@@ -289,12 +289,12 @@ if (opt$runBrukerFOVqc) {
    
   # Source functions and barcodes from Bruker Spatial Biology:
   # https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/FOV%20QC
-  if (!file.exists(opt$brukerCode)) {
-    stop("Bruker code file not found: ", opt$brukerCode)
-  } else { source(opt$brukerCode) }
-  if (!file.exists(opt$brukerData)) {
-    stop("Bruker barcodes file not found: ", opt$brukerData)
-  } else { all_panels <- readRDS(opt$brukerData) }
+  if (!file.exists(opt$brukerCodeFile)) {
+    stop("Bruker code file not found: ", opt$brukerCodeFile)
+  } else { source(opt$brukerCodeFile) }
+  if (!file.exists(opt$brukerDataFile)) {
+    stop("Bruker barcodes file not found: ", opt$brukerDataFile)
+  } else { all_panels <- readRDS(opt$brukerDataFile) }
   
   # Select barcodes corresponding to universal (UCC) panel used in the study
   ovlp <- c()
