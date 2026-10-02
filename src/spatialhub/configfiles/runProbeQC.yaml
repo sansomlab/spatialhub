@@ -3,7 +3,7 @@ resources:
     threads: 16
     mem_mb: 64000
     time: "01:00:00"
-    slurm_partition: short
+    partition: short
 
 h5ad_dir: /path/to/directory/containing/h5ad_or_rds.dir 
     # param named h5ad_dir to reflect spatialhub in/out workflow,
