@@ -84,9 +84,95 @@ def main():
     if nfiles != ngrids:
         raise ValueError(f"field number mismatch: {nfiles} files but {ngrids} rows")
 
+    # Generate corrected positions from CosMx coordinates rather than strictly regular grid positions
+    # (necessary to handle the case of shifted FOVs between big gaps in the grid).
+
+    # Convert CosMx coordinates into a common coordinate system
+    # with X increasing rightwards and Y increasing downwards.
+    x = gridpos["x_global_px"].to_numpy(dtype=float)
+    y = gridpos["y_global_px"].to_numpy(dtype=float)
+
+    x = x - x.min()
+    y = y.max() - y
+
+    # Apply overlap correction
+    scale = 1.0 - args.overlap
+    corrected_positions = np.column_stack([y * scale, x * scale])
+
+    # Ensure positions follow ASHLAR's image-series ordering
+    series_indices = [s for _, s in reader.metadata.all_series]
+    indices = gridpos.index.get_indexer(series_indices)
+    if np.any(indices < 0):
+        raise ValueError("ASHLAR series indices missing from grid positions")
+
+    corrected_positions = corrected_positions[indices]
+
+    print("Original ASHLAR positions:")
+    print(reader.metadata.positions[:10])
+
+    print("Corrected CosMx positions:")
+    print(corrected_positions[:10])
+
+    assert corrected_positions.shape == reader.metadata.positions.shape
+    assert np.isfinite(corrected_positions).all()
+
+    # Replace FileSeriesReader's regular-grid positions
+    reader.metadata._positions = corrected_positions
+
+    print("Updated ASHLAR positions match expected format:")
+    print(np.allclose(reader.metadata.positions, corrected_positions))
+    
+
     # Align the field tiles using EdgeAligner
     aligner = EdgeAligner(reader, channel=args.ch_align, max_shift=args.max_shift)
+
+    # Debugging purposes:
+    # Summarise the candidate neighbour pairs and their physical overlap
+    positions = reader.metadata.positions
+    tile_size = reader.metadata.size
+    edges = list(aligner.neighbors_graph.edges())
+
+    print(f"Tile size (Y, X): {tile_size}")
+    print(f"Number of candidate neighbour pairs: {len(edges)}")
+
+    if edges:
+        pairs = np.asarray(edges, dtype=int)
+        delta = np.abs(
+            positions[pairs[:, 0]] - positions[pairs[:, 1]]
+        )
+        overlap = tile_size - delta
+        valid = np.all(overlap > 0, axis=1)
+
+        print("Pairs with physical overlap:", valid.sum())
+        print("Pairs without physical overlap:", (~valid).sum())
+
+        if valid.any():
+            print(
+                "Median overlap (Y, X), pixels:",
+                np.median(overlap[valid], axis=0)
+            )
+
+    # Run the alignment process
     aligner.run()
+
+    # Debugging purposes:
+    # Summarise alignment results
+    shifts = np.asarray(aligner.shifts)
+
+    print("Number of tiles:", len(shifts))
+    print("Number of neighbouring tile pairs:",
+        aligner.neighbors_graph.number_of_edges())
+
+    print("Number of registered pairs:",
+        sum(np.isfinite(error) for _, error in aligner._cache.values()))
+
+    print("Shift range (pixels):")
+    print("  Y:", shifts[:, 0].min(), shifts[:, 0].max())
+    print("  X:", shifts[:, 1].min(), shifts[:, 1].max())
+
+    print("Tiles with non-zero shifts:",
+        np.count_nonzero(np.any(np.abs(shifts) > 0.01, axis=1)))
+
 
     # Write out the stitched mosaic to an OME-TIFF file
     mosaic = Mosaic(aligner, aligner.mosaic_shape, channels=ch_lst)
