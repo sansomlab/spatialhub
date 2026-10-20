@@ -7,6 +7,7 @@ dependencies = [
     "snakemake>=9",
     "snakemake-executor-plugin-drmaa",
     "ashlar",
+    "rasterio",
     "pandas==2.3.3",
     "anndata==0.12.16",
     "bin2cell",
@@ -21,7 +22,7 @@ dependencies = [
     "rctd-py",
     "sopa[cellpose]",
     "ipykernel",
-    "rich-argparse"
+    "rich-argparse",
 ]
 requires-python = ">=3.12"
 readme = "README.md"
