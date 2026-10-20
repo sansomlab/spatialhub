@@ -59,6 +59,10 @@ WORKFLOWS = {
         "Cell2Location.",
         [],
     ),
+    "addShapes": (
+        "Add shapes to a SpatialData (Zarr) file.",
+        [],
+    ),
 }
 
 
@@ -168,8 +172,7 @@ def validate_config(workflow):
 
     if not account:
         _account_error(
-            f"No Slurm account set under 'resources.account' in "
-            f"{config_path.name}."
+            f"No Slurm account set under 'resources.account' in " f"{config_path.name}."
         )
 
     if account == PLACEHOLDER_ACCOUNT:
