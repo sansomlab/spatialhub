@@ -1,8 +1,8 @@
 
 
-```{css zoom-lib-src, echo = FALSE}
-script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"
-```
+ ```{=html}
+ <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+ ```
 
 ```{js zoom-jquery, echo = FALSE}
  $(document).ready(function() {
