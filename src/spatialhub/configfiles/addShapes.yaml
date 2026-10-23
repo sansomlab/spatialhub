@@ -6,7 +6,7 @@ resources:
     slurm_partition: short
 
 gpu_resources:
-    slurm_partition: gpu_short       # your actual GPU partition name
+    slurm_partition: gpu_a100_40gb       # your actual GPU partition name
     n_gpus: 1                        # becomes --gres=gpu:1
     # gres_cmd: "--gpus-per-node 1"  # override to use gpus-per-node instead
 
