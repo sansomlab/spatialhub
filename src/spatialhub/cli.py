@@ -148,9 +148,10 @@ def _account_error(message):
 def validate_config(workflow):
     """Pre-flight check of the workflow config before Snakemake is invoked.
 
-    Validates that resources.account is set to a real Slurm account rather than
-    the template placeholder, so failures surface here rather than inside a
-    verbose Snakemake/DRMAA traceback.
+    Validates that the Slurm account is set to a real account rather than the
+    template placeholder, so failures surface here rather than inside a verbose
+    Snakemake/DRMAA traceback. Reads either naming dialect (slurm_account or
+    account) during the transition to native-Slurm resource names.
     """
     config_path = Path.cwd().joinpath(f"{workflow}.yaml")
     if not config_path.exists():
@@ -164,17 +165,17 @@ def validate_config(workflow):
         config = yaml.safe_load(fh) or {}
 
     resources = config.get("resources") or {}
-    account = resources.get("account")
+    account = resources.get("slurm_account") or resources.get("account")
 
     if not account:
         _account_error(
-            f"No Slurm account set under 'resources.account' in "
+            f"No Slurm account set under 'resources' (slurm_account) in "
             f"{config_path.name}."
         )
 
     if account == PLACEHOLDER_ACCOUNT:
         _account_error(
-            f"'resources.account' in {config_path.name} is still the template "
+            f"The Slurm account in {config_path.name} is still the template "
             f"placeholder '{PLACEHOLDER_ACCOUNT}'. Assign a valid Slurm account."
         )
 
@@ -216,6 +217,7 @@ def run_snakemake(smkpath, task, cores, jobs, dry_run, lock):
     drmaa_args = (
         " -A {resources.account} -p {resources.partition} "
         + "--mem={resources.mem_mb} --cpus-per-task={threads} --time={resources.time} "
+        + "{resources.gres_cmd} "
         + "--output=logs/job_%j.out --error=logs/job_%j.err "
     )
     log_dir = "logs"

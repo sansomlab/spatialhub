@@ -1,9 +1,14 @@
 resources:
-    account: slurm_account
+    slurm_account: slurm_account
     threads: 16
     mem_mb: 96000
     time: "04:00:00"
     slurm_partition: short
+
+gpu_resources:
+    slurm_partition: gpu_short       # your actual GPU partition name
+    n_gpus: 1                        # becomes --gres=gpu:1
+    # gres_cmd: "--gpus-per-node 1"  # override to use gpus-per-node instead
 
 zarr_dir: /path/to/zarr/directory
 

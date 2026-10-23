@@ -12,6 +12,7 @@ else:
 
 RESOURCES = {"threads": 4, "mem_mb": 16000, "time": "04:00:00", "partition": "short"}
 RESOURCES.update(config.get("resources", {}))
+RESOURCES.setdefault("gres_cmd", "")
 
 extract_tables = map(str.strip, config["extract_tables"].split(","))
 

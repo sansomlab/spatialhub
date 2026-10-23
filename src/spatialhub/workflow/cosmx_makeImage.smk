@@ -19,6 +19,7 @@ RESOURCES = {
     "partition": "short",
 }
 RESOURCES.update(config.get("resources", {}))
+RESOURCES.setdefault("gres_cmd", "")
 
 OUTDIR = config["outdir"]
 IMAGE_DIR = os.path.join(OUTDIR, "image.dir")

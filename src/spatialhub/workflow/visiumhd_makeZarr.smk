@@ -14,6 +14,7 @@ else:
 
 RESOURCES = {"threads": 4, "mem_mb": 16000, "time": "04:00:00", "partition": "short"}
 RESOURCES.update(config.get("resources", {}))
+RESOURCES.setdefault("gres_cmd", "")
 
 task_dict = config["tasks"]
 task_df = pd.DataFrame.from_dict(task_dict, orient="index")

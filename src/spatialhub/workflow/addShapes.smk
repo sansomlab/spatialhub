@@ -10,8 +10,35 @@ if "lock" in config:
 else:
     LOCK = "false"
 
-RESOURCES = {"threads": 4, "mem_mb": 16000, "time": "04:00:00", "partition": "short"}
+# Base resources, in native-Slurm dialect (slurm_partition / slurm_account).
+# gres_cmd defaults to "" so the CLI's {resources.gres_cmd} template substitutes
+# cleanly on CPU rules (DRMAA requires the key present on every rule).
+RESOURCES = {
+    "threads": 4,
+    "mem_mb": 16000,
+    "time": "04:00:00",
+    "slurm_partition": "short",
+    "gres_cmd": "",
+}
 RESOURCES.update(config.get("resources", {}))
+RESOURCES.setdefault("gres_cmd", "")
+
+# Transitional shim: the shared DRMAA submission string still references the
+# legacy {resources.partition}/{resources.account} names. Populate those from a
+# single native-dialect source so one config value drives both, with no
+# duplicate key in the YAML to drift. After migration to the native executor,
+# it reads slurm_partition / slurm_account directly and these two lines go away.
+RESOURCES["partition"] = RESOURCES["slurm_partition"]
+RESOURCES["account"] = RESOURCES.get("slurm_account", "")
+
+# GPU resources: inherit the base, override partition (both names), add GRES.
+_gpu_cfg = config.get("gpu_resources", {})
+GPU_RESOURCES = dict(RESOURCES)
+_gpu_part = _gpu_cfg.get("slurm_partition", RESOURCES["slurm_partition"])
+GPU_RESOURCES["slurm_partition"] = _gpu_part
+GPU_RESOURCES["partition"] = _gpu_part
+_n_gpus = _gpu_cfg.get("n_gpus", 1)
+GPU_RESOURCES["gres_cmd"] = _gpu_cfg.get("gres_cmd", f"--gres=gpu:{_n_gpus}")
 
 FILE_LST = [f for f in os.listdir(config["zarr_dir"]) if f.endswith(".zarr")]
 
@@ -55,7 +82,7 @@ rule add_cellpose:
     log:
         os.path.join(config["zarr_dir"], "{fname}.addShapeCellpose.log"),
     resources:
-        **RESOURCES,
+        **GPU_RESOURCES,
     params:
         zarr_dir=config["zarr_dir"],
         ch_nuc=SHAPES_TO_ADD["cellpose"]["ch_nuc"],
