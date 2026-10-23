@@ -102,7 +102,8 @@ if (opt$runFOVqc) {
   print("Calculating FOV-level QC metrics.")
   # Aggregate cell-level metrics at the FOV level
   df <- df0 |> dplyr::select(-instance_id, -sample_id)
-  
+  df_match <- df0 |> dplyr::select(FOV, sample_id)
+
   # focusing on a subset of quantitative variables that make sense to aggregate at the FOV level
   # NOTE: could be interesting to have these FOV-level metrics for fluorescence data too...
   df <- df |> dplyr::select(FOV, nCount_neg, nCount_sys,
@@ -134,9 +135,14 @@ if (opt$runFOVqc) {
   fovQC_file <- paste0(opt$run_dir, "/", opt$sample_id, "_brukerQCresults.csv")
   if(file.exists(fovQC_file)) {
     dfov0 <- read.csv(fovQC_file, header = TRUE)
-    #dfov0 <- dfov0 |> dplyr::select(-gene, -failed_cycles)
-    dfov0 <- dfov0[!duplicated(dfov0), ] |> dplyr::arrange(FOV)
+    dfov0 <- dfov0 |>
+      dplyr::select(-any_of(c("gene", "failed_cycles"))) |>
+      dplyr::distinct() |>
+      dplyr::arrange(FOV)
     dfov <- plyr::join(dfov, dfov0, by = "FOV") |>
+      dplyr::relocate(sample_id, .before = FOV)
+  } else {
+    dfov <- plyr::join(df_match, dfov, by = "FOV") |>
       dplyr::relocate(sample_id, .before = FOV)
   }
 
@@ -155,7 +161,7 @@ if (opt$runFOVqc) {
 
 print("Calculating sample-level QC metrics.")
 # Aggregate cell-level metrics at the FOV level
-df <- df0 |> dplyr::select(-instance_id, -FOV)
+df <- df0 |> dplyr::select(-instance_id, -any_of(c("FOV")))
 
 # focusing on quantitative variables that make sense to aggregate at the sample level
 df <- df |> dplyr::select(sample_id, nCount_neg, nCount_sys,

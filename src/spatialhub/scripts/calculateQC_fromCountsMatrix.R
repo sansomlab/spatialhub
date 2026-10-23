@@ -339,9 +339,9 @@ if (opt$runBrukerFOVqc) {
     dfg <- dfg |>
       dplyr::arrange(gene) |>
       dplyr::arrange(desc(failed_cycles)) |>
-      dplyr::arrange(fov)
+      dplyr::arrange(FOV)
 
-    dfov <- plyr::join(fov, dfg, by = "FOV", type = "full")
+    dfov <- plyr::join(dfov, dfg, by = "FOV", type = "full")
 
     # Compute fraction of failed genes per FOV
     #dfract <- data.frame(table(dfg$fov) / nrow(barcodes))
@@ -383,7 +383,9 @@ write.csv(probe_class, row.names = FALSE, quote = FALSE,
 
 
 # Write cell-level metadata
-write.csv(as.data.frame(colData(sce)), row.names = FALSE, quote = FALSE, 
+metadata <- as.data.frame(colData(sce))
+if (!"instance_id" %in% names(metadata)) { metadata$instance_id <- colnames(sce) }
+write.csv(metadata, row.names = FALSE, quote = FALSE, 
           file = paste0(opt$outdir, "/", pathStem, "_cellMetadata.csv"))
 
 
