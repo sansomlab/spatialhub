@@ -50,6 +50,10 @@ WORKFLOWS = {
         "by aggregating points and shapes (typically CosMx).",
         [],
     ),
+    "runProbeQC": (
+        "Run probe-level QC on a panel dataset (typically CosMx).",
+        ["Cell QC", "FOV QC (optional)", "Sample QC"]
+    ),
     "runRCTD": (
         "Deconvolve cell-type abundances against a single-cell reference using RCTD.",
         [],

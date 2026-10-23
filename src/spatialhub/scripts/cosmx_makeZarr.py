@@ -78,10 +78,19 @@ def main():
         ["Position_X", "Position_Y", "x_global_px", "y_global_px"]
     ].to_dict(orient="index")
 
-    # Read the transcript CSV and compute global coordinates for each transcript
-    tx = pd.read_csv(args.tx_csv, header=0)
-    if "fov" in tx.columns:
-        tx.rename(columns={"fov": "FOV"}, inplace=True)
+    # Read the transcript CSV (in chunks - memory saving)
+    # and compute global coordinates for each transcript
+    chunks = []
+    for chunk in pd.read_csv(
+        args.tx_csv,
+        chunksize=200_000,
+        #usecols=["target", "x", "y", "z", "cell", "fov"],
+    ):
+        if "fov" in chunk.columns:
+            chunk.rename(columns={"fov": "FOV"}, inplace=True)
+        filtered = chunk[chunk["FOV"].isin(fov2pos.keys())]
+        chunks.append(filtered)
+    tx = pd.concat(chunks, ignore_index=True)
     missing = {"FOV", "x_global_px", "y_global_px", "target"} - set(tx.columns)
     if missing:
         raise ValueError(f"missing {', '.join(sorted(missing))} in tx table")
@@ -104,13 +113,13 @@ def main():
     # Create PointsModel objects for each category of transcripts
     points = {
         "main": spd.models.PointsModel.parse(
-            tx.loc[idx_main], feature_key="target", coordinates={"x": "x", "y": "y"}
+            tx.loc[idx_main], feature_key="target", coordinates={"x": "x", "y": "y", "z": "z"}
         ),
         "ctrl": spd.models.PointsModel.parse(
-            tx.loc[idx_ctrl], feature_key="target", coordinates={"x": "x", "y": "y"}
+            tx.loc[idx_ctrl], feature_key="target", coordinates={"x": "x", "y": "y", "z": "z"}
         ),
         "other": spd.models.PointsModel.parse(
-            tx.loc[idx_other], feature_key="target", coordinates={"x": "x", "y": "y"}
+            tx.loc[idx_other], feature_key="target", coordinates={"x": "x", "y": "y", "z": "z"}
         ),
     }
 
