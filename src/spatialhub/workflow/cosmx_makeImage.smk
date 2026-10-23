@@ -132,12 +132,7 @@ rule link_image:
 
 rule run_ashlar:
     input:
-        os.path.join(
-            IMAGE_DIR,
-            "ashlar.dir",
-            "{smp}",
-            "grid_positions.csv",
-        ),
+        fov_pos=lambda wc: task_dict[wc.smp]["fovpos_csv"],
     output:
         os.path.join(
             IMAGE_DIR,
@@ -166,13 +161,8 @@ rule run_ashlar:
             "ashlar.dir",
             "{smp}",
         ),
-        field_dir=os.path.join(
-            IMAGE_DIR,
-            "ashlar.dir",
-            "{smp}",
-            "field_links",
-        ),
-        name_pattern="F{series:05}.TIF",
+        fov_lst=lambda wc: task_dict[wc.smp]["fovlst"],
+        m2d_pfx=lambda wc: task_dict[wc.smp]["morph_pfx"],
         px_size=config["px_size"],
         overlap=config["ashlar"]["overlap"],
         max_shift=config["ashlar"]["max_shift"],
@@ -185,95 +175,15 @@ rule run_ashlar:
     shell:
         """
         python -m spatialhub.scripts.cosmx_runAshlar \
-            --gridpos-csv {input} \
-            --field-dir {params.field_dir} \
-            --name-pattern '{params.name_pattern}' \
+            --fov-csv {input.fov_pos} \
+            --fov-lst {params.fov_lst} \
+            --m2d-pfx {params.m2d_pfx} \
             --px-size {params.px_size} \
             --overlap {params.overlap} \
             --max-shift {params.max_shift} \
             --ch-align {params.ch_align} \
             {params.ch_out} \
             {params.outdir} >{log} 2>&1
-        """
-
-
-rule complete_grid:
-    input:
-        fov_pos=lambda wc: task_dict[wc.smp]["fovpos_csv"],
-        mock_fov=os.path.join(
-            IMAGE_DIR,
-            "ashlar.dir",
-            "mock_fov.tiff",
-        ),
-    output:
-        directory(
-            os.path.join(
-                IMAGE_DIR,
-                "ashlar.dir",
-                "{smp}",
-                "field_links",
-            )
-        ),
-        os.path.join(
-            IMAGE_DIR,
-            "ashlar.dir",
-            "{smp}",
-            "grid_positions.csv",
-        ),
-    log:
-        os.path.join(
-            IMAGE_DIR,
-            "ashlar.dir",
-            "{smp}",
-            "cosmx_completeGrid.log",
-        ),
-    resources:
-        **RESOURCES,
-    params:
-        outdir=os.path.join(
-            IMAGE_DIR,
-            "ashlar.dir",
-            "{smp}",
-        ),
-        fov_lst=lambda wc: task_dict[wc.smp]["fovlst"],
-        m2d_pfx=lambda wc: task_dict[wc.smp]["morph_pfx"],
-    shell:
-        """
-        python -m spatialhub.scripts.cosmx_completeGrid \
-            --fov-csv {input.fov_pos} \
-            --fov-lst {params.fov_lst} \
-            --m2d-pfx {params.m2d_pfx} \
-            --mock-tiff {input.mock_fov} \
-            {params.outdir} >{log} 2>&1
-        """
-
-
-rule gen_blank_fov:
-    output:
-        os.path.join(
-            IMAGE_DIR,
-            "ashlar.dir",
-            "mock_fov.tiff",
-        ),
-    log:
-        os.path.join(
-            IMAGE_DIR,
-            "ashlar.dir",
-            "cosmx_genBlankFOV.log",
-        ),
-    resources:
-        **RESOURCES,
-    params:
-        width=config["fov_width"],
-        height=config["fov_height"],
-        n_channels=config["n_channels"],
-    shell:
-        """
-        python -m spatialhub.scripts.cosmx_genBlankFOV \
-            --width {params.width} \
-            --height {params.height} \
-            --n-channels {params.n_channels} \
-            {output} >{log} 2>&1
         """
 
 
