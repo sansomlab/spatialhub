@@ -59,7 +59,7 @@ WORKFLOWS = {
         "Cell2Location.",
         [],
     ),
-    "addShapes": (
+    "addZarrShape": (
         "Add shapes to a SpatialData (Zarr) file.",
         [],
     ),

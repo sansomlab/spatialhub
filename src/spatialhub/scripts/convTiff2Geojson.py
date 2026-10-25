@@ -2,6 +2,7 @@ import numpy as np
 import rasterio
 import geopandas as gpd
 
+from rasterio.features import shapes
 from shapely.geometry import shape
 from argparse import ArgumentParser as AP
 from spatialhub.scripts.utils import die, print_arguments, RESET, GREEN
@@ -30,7 +31,7 @@ def main():
         raise ValueError("Segment labels must contain 0 as background label.")
 
     segments = []
-    pg_lst = rasterio.features.shapes(msk.astype(np.int32, copy=False), mask=(msk != 0))
+    pg_lst = shapes(msk.astype(np.int32, copy=False), mask=(msk != 0))
     for geom, value in pg_lst:
         segments.append({"label": int(value), "geometry": shape(geom)})
     gdf = gpd.GeoDataFrame(segments, crs=None)
