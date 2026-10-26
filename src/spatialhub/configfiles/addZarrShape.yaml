@@ -8,6 +8,7 @@ resources:
 geojson_dir: /users/sansom/vlw740/work/Psoriasis/newbatch/geojson.dir
 zarr_dir: /users/sansom/vlw740/work/Psoriasis/newbatch/zarr.dir
 shape_key: cellpose_segments
+geojson_index: index # the index column name in the geojson file
 
 shapes2add:
     sample1: /path/to/sample1/shape/to/be/added.tif
