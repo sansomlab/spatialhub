@@ -18,6 +18,7 @@ def main():
         raise KeyError(f"Shape key '{args.key}' already exists.")
 
     gdf = gpd.read_file(args.geojson_path)
+    gdf.set_crs(None, allow_override=True, inplace=True)
     if gdf.empty:
         raise ValueError("GeoJSON contains no shapes.")
     if not gdf.geometry.is_valid.all():

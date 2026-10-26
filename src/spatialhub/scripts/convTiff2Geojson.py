@@ -30,17 +30,20 @@ def main():
     if not np.any(msk == 0):
         raise ValueError("Segment labels must contain 0 as background label.")
 
+    ndigits = np.log10(msk.max()).astype(int) + 1
     segments = []
     pg_lst = shapes(msk.astype(np.int32, copy=False), mask=(msk != 0))
     for geom, value in pg_lst:
-        segments.append({"label": int(value), "geometry": shape(geom)})
+        segments.append(
+            {"label": f"seg-{int(value):0{ndigits}d}", "geometry": shape(geom)}
+        )
     gdf = gpd.GeoDataFrame(segments, crs=None)
     gdf = gdf.dissolve(by="label")
     gdf["area"] = gdf.area
-
     _, npx = np.unique(msk, return_counts=True)
     if not np.allclose(gdf.sort_index()["area"].values, npx[1:], atol=1e-9):
         raise ValueError("Polygon areas do not match pixel counts.")
+    gdf.index.name = None
 
     gdf.to_file(args.geojson_out, driver="GeoJSON")
 

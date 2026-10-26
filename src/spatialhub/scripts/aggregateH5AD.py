@@ -1,4 +1,5 @@
 import os
+import anndata
 import spatialdata as spd
 
 from argparse import ArgumentParser as AP
@@ -37,33 +38,50 @@ def main():
     sdata = spd.read_zarr(args.in_zarr)
 
     if args.seg_idx is not None:
+        if args.seg_idx not in sdata[args.shapes_by].columns:
+            raise ValueError(
+                f"Segment index column '{args.seg_idx}' not found in shapes."
+            )
         if sdata[args.shapes_by][args.seg_idx].isna().any():
-            raise ValueError(
-                f"Segment index column '{args.seg_idx}' contains missing values."
-            )
-        if not sdata[args.shapes_by][args.seg_idx].is_unique:
-            raise ValueError(
-                f"Segment index column '{args.seg_idx}' contains duplicate values."
-            )
-        sdata[args.shapes_by].set_index(args.seg_idx, inplace=True)
+            raise ValueError(f"Missing values in segment index '{args.seg_idx}'.")
 
-    adata = sdata.aggregate(
-        values=args.points_from,
-        by=args.shapes_by,
-        agg_func=args.agg_func,
-        target_coordinate_system=args.coords,
-        deepcopy=True,
-    )["table"]
+        sdata[args.shapes_by].set_index(args.seg_idx, inplace=True)
+        sdata[args.shapes_by].index = sdata[args.shapes_by].index.astype(str)
+
+        if not sdata[args.shapes_by].index.is_unique:
+            raise ValueError(f"Duplicate values in segment index '{args.seg_idx}'.")
+
+    adata_dict = {}
+    for points_from in args.points_from.split(","):
+        if points_from not in sdata:
+            raise KeyError(f"Points '{points_from}' not found in Zarr file.")
+        adata_dict[points_from] = sdata.aggregate(
+            values=points_from,
+            by=args.shapes_by,
+            agg_func=args.agg_func,
+            target_coordinate_system=args.coords,
+            deepcopy=True,
+        )["table"]
+    adata = anndata.concat(
+        adata_dict, axis="var", join="outer", merge="same", label="points_from"
+    )
+    if not adata.var_names.is_unique:
+        raise ValueError("Duplicated feature names after concatenation.")
+    if not adata.obs_names.is_unique:
+        raise ValueError("Duplicated segment IDs after aggregation.")
+
     shapes_t = spd.transform(sdata[args.shapes_by], to_coordinate_system=args.coords)
+    if not adata.obs_names.isin(shapes_t.index).all():
+        raise ValueError("Some aggregated segments are missing from shapes.")
     print(
         f"{YELLOW}Segment centroids and area will be computed in coordinate system "
         f"'{args.coords}' (CRS: '{shapes_t.crs}').{RESET}"
     )
-
-    centroids = shapes_t.loc[adata.obs_names, "geometry"].centroid
+    geometries = shapes_t.loc[adata.obs_names].geometry
+    centroids = geometries.centroid
     adata.obs["centroid.x"] = centroids.x.to_numpy()
     adata.obs["centroid.y"] = centroids.y.to_numpy()
-    adata.obs["area"] = shapes_t.loc[adata.obs_names, "geometry"].area.to_numpy()
+    adata.obs["area"] = geometries.area.to_numpy()
 
     if args.agg_name in adata.layers:
         raise ValueError(f"Layer '{args.agg_name}' already exists.")
