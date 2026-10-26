@@ -2,6 +2,7 @@ import os
 import anndata
 import spatialdata as spd
 
+from pathlib import Path
 from argparse import ArgumentParser as AP
 from spatialhub.scripts.utils import die, print_arguments, RESET, GREEN, YELLOW
 
@@ -51,8 +52,9 @@ def main():
         if not sdata[args.shapes_by].index.is_unique:
             raise ValueError(f"Duplicate values in segment index '{args.seg_idx}'.")
 
+    points_from_list = [x.strip() for x in args.points_from.split(",") if x.strip()]
     adata_dict = {}
-    for points_from in args.points_from.split(","):
+    for points_from in points_from_list:
         if points_from not in sdata:
             raise KeyError(f"Points '{points_from}' not found in Zarr file.")
         adata_dict[points_from] = sdata.aggregate(
@@ -86,6 +88,18 @@ def main():
     if args.agg_name in adata.layers:
         raise ValueError(f"Layer '{args.agg_name}' already exists.")
     adata.layers[args.agg_name] = adata.X.copy()
+
+    sample_id = Path(args.in_zarr).name.removesuffix(".zarr")
+    adata.obs["sample_id"] = sample_id
+
+    adata.uns["counts_mtx_source"] = {
+        "input_zarr": str(args.in_zarr),
+        "sample_id": sample_id,
+        "points_from": points_from_list,
+        "shapes_by": args.shapes_by,
+        "agg_func": args.agg_func,
+        "coords_system": args.coords,
+    }
 
     adata.write(args.h5adout, compression="gzip")
 
