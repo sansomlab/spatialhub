@@ -1,0 +1,103 @@
+
+
+```{r echo=FALSE, eval=FALSE, include = FALSE}
+# This chunk is only for manual debugging outside of the Snakemake workflow
+params <- list(
+  group = "tissue",
+  composite_ncol = 2,
+  composite_spacing = 600,
+  cell_nCount_cutoff = 50,
+  cell_nFeature_cutoff = 20,
+  cell_percentNeg_cutoff = 1,
+  cell_complexity_cutoff = 1.05,
+  exclCellsInFailedFOVs = TRUE,
+  plot_ncol_spatial = 4,
+  plot_ncol = 2,
+  font_size = 10,
+  legend_size = 3
+)
+```
+
+
+# Overview
+
+[Insert your study description here]
+
+
+## Data import
+
+Importing cell-level QC metrics and metadata from `spatialhub` probeqc pipeline:
+
+```{r import_data}
+# Import QC metrics
+probeqc_files <- list.files('.', full.names = TRUE)
+qcmetrics_file <- probeqc_files[grep("_cellQCmetrics\\.csv$", probeqc_files)]  # output from pipeline probeqc
+spx_meta <- read.csv(qcmetrics_file)
+
+# Define study-specific contrast variable (notably, to split plots)
+x <- params$group
+spx_meta$group <- factor(as.character(spx_meta[, x]))
+```
+
+
+Creating composite slide(s) for visualization purposes:
+
+```{r composite_slide}
+makeCompositeSlide <- function(spx_meta, sample_key = NA,
+                               spacing = 500, n_col, composite_id = '0') {
+
+    # spx_meta: spatial metadata object for which to create a composite slide
+    #   =>  filter for samples to include on this composite slide only if creating several slides
+    #       and make sure the metadata is sorted in the correct order
+    # sample_key: name of column in spatial metadata object where the unique sample identifier
+    #   (taking into account the source slide) is stored
+    #   Defaults to 'sample_id' x 'slide_id' if not specified
+    # spacing: blank space to leave between samples (in same unit as cell coordinates)
+    # n_col: number of columns in the composite slide
+    # composite_id: identifier for the composite slide, if splitting the dataset into several
+
+    if (is.na(sample_key)) {
+        spx_meta$sample_index <- paste0(spx_meta$sample_id, "_", spx_meta$slide_id)
+    } else {
+        spx_meta$sample_index <- spx_meta[, sample_key]
+    }
+  
+    # Split dataset by sample with its stitched coordinates
+    spx_meta_ls <- split.data.frame(spx_meta, f = spx_meta$sample_index)
+    #names(spx_meta_ls)
+
+    # Define grid size to place samples on
+    u <- c(max(spx_meta$x), max(spx_meta$y))
+    # Let's place samples on a grid of U x U pixels per sample
+    grid_size <- plyr::round_any(ceiling(max(u) + spacing), spacing*2, f = ceiling) 
+    print("Per sample grid-size (parameter necessary for MuSpAn QCM analysis):")
+    print(grid_size)
+
+    for (i in 1:length(spx_meta_ls)) {
+        df_tp <- spx_meta_ls[[i]]
+        df_tp$CenterX_composite <- df_tp$x + grid_size * ((i-1) %% n_col)
+        df_tp$CenterY_composite <- df_tp$y + grid_size * floor((i-1) / n_col)
+        spx_meta_ls[[i]] <- df_tp
+    }
+    
+    spx_meta <- do.call(rbind.data.frame, spx_meta_ls)
+    spx_meta$composite_slide <- composite_id
+    spx_meta <- spx_meta |> dplyr::select(-sample_index)
+
+    spx_meta
+
+}
+
+spx_slide_ls <- split.data.frame(spx_meta, f = spx_meta$slide_id)
+for (i in 1:length(spx_slide_ls)) {
+  spx <- spx_slide_ls[[i]]; slide <- names(spx_slide_ls)[i]
+  spx_slide_ls[[i]] <- makeCompositeSlide(
+    spx, 
+    composite_id = paste0(slide, '_composite'),
+    n_col = as.integer(params$composite_ncol),
+    spacing = as.integer(params$composite_spacing)
+  )
+}
+spx_meta <- do.call(rbind.data.frame, spx_slide_ls)
+```
+
