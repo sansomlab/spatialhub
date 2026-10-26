@@ -10,7 +10,9 @@ def main():
     p.add_argument("zarr_path", help="Path to the Zarr directory.")
     p.add_argument("--geojson-path", required=True, help="Path to the GeoJSON file.")
     p.add_argument("--key", required=True, help="Zarr key for the shapes data.")
-    p.add_argument("--index", required=True, help="Index column in the GeoJSON table.")
+    p.add_argument(
+        "--index", default="index", help="Index column name in the GeoJSON file."
+    )
     args = p.parse_args()
     print_arguments(args)
 

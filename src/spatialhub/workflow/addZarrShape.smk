@@ -78,6 +78,7 @@ rule add_shapes:
     params:
         shpdir=lambda wc, input: os.path.join(input.zarr_path, "shapes", SHAPE_KEY),
         shapekey=SHAPE_KEY,
+        index=config.get("geojson_index", "index"),
     shell:
         """
         rmdir {params.shpdir:q}
@@ -85,5 +86,6 @@ rule add_shapes:
             {input.zarr_path:q} \
             --geojson-path {input.shape_file:q} \
             --key {params.shapekey:q} \
+            --index {params.index:q} \
             >{log:q} 2>&1
         """

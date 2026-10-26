@@ -1,0 +1,16 @@
+# Suggested QC configuration for CosMx projects (very low level thresholds for first pass QC filtering )
+
+# Cell-level QC thresholds
+cell_nCount_cutoff: 20 
+cell_nFeature_cutoff: 5
+cell_percentNeg_cutoff: 5
+cell_complexity_cutoff: 1
+
+# FOV-level QC thresholds
+fov_nCount_cutoff: 50
+fov_SNR_cutoff: 3
+
+# Sample-level QC thresholds
+sampleMinCells: 2000   # minimal number of cells passing QC for the sample to be considered high quality
+sampleMinPercent: 50    # minimal percentage of cells passing QC for the sample to be considered high quality
+exclCellsInFailedFOVs: true  # when calculating the number of cells that pass QC for the sample, should high-quality cells in bad quality FOVs be excluded? (true/false)
