@@ -67,6 +67,10 @@ rule full:
             os.path.join(IMAGE_DIR, "{smp}", "image.ome.tiff"),
             smp=SAMPLE_LST,
         ),
+        expand(
+            os.path.join(IMAGE_DIR, "{smp}", "FOV.size.px.txt"),
+            smp=SAMPLE_LST,
+        ),
     resources:
         **RESOURCES,
     params:
@@ -89,6 +93,11 @@ rule link_image:
             "{smp}",
             "FOV.positions.csv",
         ),
+        size_txt=os.path.join(
+            IMAGE_SOURCE_DIR,
+            "{smp}",
+            "FOV.size.px.txt",
+        ),
         morph_tiff=os.path.join(
             IMAGE_SOURCE_DIR,
             "{smp}",
@@ -99,6 +108,11 @@ rule link_image:
             IMAGE_DIR,
             "{smp}",
             "FOV.positions.csv",
+        ),
+        size_txt=os.path.join(
+            IMAGE_DIR,
+            "{smp}",
+            "FOV.size.px.txt",
         ),
         morph_tiff=os.path.join(
             IMAGE_DIR,
@@ -123,6 +137,10 @@ rule link_image:
         ln -sfn \
             ../{params.source}/{wildcards.smp}/FOV.positions.csv \
             {output.fov_csv}
+        
+        ln -sfn \
+            ../{params.source}/{wildcards.smp}/FOV.size.px.txt \
+            {output.size_txt}
 
         ln -sfn \
             ../{params.source}/{wildcards.smp}/image.ome.tiff \
@@ -145,6 +163,12 @@ rule run_ashlar:
             "ashlar.dir",
             "{smp}",
             "image.ome.tiff",
+        ),
+        os.path.join(
+            IMAGE_DIR,
+            "ashlar.dir",
+            "{smp}",
+            "FOV.size.px.txt",
         ),
     log:
         os.path.join(
@@ -196,6 +220,12 @@ rule assemble_fovs:
             "assembly.dir",
             "{smp}",
             "FOV.positions.csv",
+        ),
+        os.path.join(
+            IMAGE_DIR,
+            "assembly.dir",
+            "{smp}",
+            "FOV.size.px.txt",
         ),
         os.path.join(
             IMAGE_DIR,

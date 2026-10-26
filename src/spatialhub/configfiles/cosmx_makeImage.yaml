@@ -8,8 +8,6 @@ resources:
 outdir: /path/to/output/directory
 
 # Image/FOV properties
-fov_width: 4256
-fov_height: 4256
 n_channels: 5
 px_size: 0.120280945
 

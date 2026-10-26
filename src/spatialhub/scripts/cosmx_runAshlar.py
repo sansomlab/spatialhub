@@ -105,9 +105,16 @@ def main():
             pixel_size=args.px_size,
         )
 
+        # Save original FOV dimensions (height, width) in pixels - useful for cosmx_makeZarr
+        height, width = map(int, reader.metadata.size)
+        out_size = os.path.join(args.outdir, "FOV.size.px.txt")
+        with open(out_size, "w") as f:
+            f.write(f"{width},{height}\n")
+        print(f"FOV dimensions: {width} x {height} pixels")
+
         # Match coordinates to ASHLAR's internal image ordering
         series_fovs = [int(s) for _, s in reader.metadata.all_series]
-        if series_fovs != fovs:
+        if sorted(series_fovs) != sorted(fovs):
             raise ValueError("ASHLAR FileSeriesReader FOV identifiers do not match input FOVs")
 
         pos = fovpos.loc[series_fovs]

@@ -33,8 +33,8 @@ def calculate_pseudoSNR(points_df, rna_probes, neg_probes, alpha = 3):
     rna_probes = set(rna_probes)
     neg_probes = set(neg_probes)
 
-    if not rna_probes or not neg_probes:
-        raise ValueError("RNA and negative probe sets must be provided")
+    if not rna_probes:
+        raise ValueError("RNA probe set must be provided")
     if rna_probes & neg_probes:
         raise ValueError("RNA and negative probe sets overlap")
 
@@ -203,12 +203,13 @@ def main():
     # Required arguments
     p.add_argument("output", help="Output Zarr directory.")
     p.add_argument("--fov-csv", required=True, help="CosMx FOV position CSV file.")
+    p.add_argument("--tile-size", required=True, help="Size of FOV tile.")
     p.add_argument("--tx-csv", required=True, help="CosMx transcript CSV file.")
     p.add_argument("--morph-tiff", required=True, help="Assembled/stitched TIFF image.")
     # Optional arguments
     p.add_argument("--pg-csv", default=None, help="CosMx polygon CSV file.")
     p.add_argument("--channels", default=None, help="Comma-separated channel names.")
-    p.add_argument("--ctrl-regex", default=None, help="Regex for control probes.")
+    p.add_argument("--ctrl-regex", default='Negative|SystemControl', help="Regex for control probes, including positive and negative ones.")
     p.add_argument("--other-regex", default=None, help="Regex for other probes.")
     p.add_argument("--scales", default=None, help="Comma-separated image scales.")
     p.add_argument("--alpha", type=float, default=3.0, help="Pseudocount for SNR calculation (default: 3).")
@@ -228,6 +229,9 @@ def main():
         raise FileNotFoundError(f"Transcript file '{args.tx_csv}' not found")
     if not os.path.exists(args.morph_tiff):
         raise FileNotFoundError(f"TIFF file '{args.morph_tiff}' not found")
+    
+    if not np.isfinite(args.alpha) or args.alpha <= 0:
+        raise ValueError("--alpha must be finite and strictly positive")
 
     
     ### Prepare Images ###
@@ -276,7 +280,8 @@ def main():
     exclude_regex = "|".join(f"(?:{p})" for p in patterns)
 
     rna_probes = tx.loc[
-        ~tx["target"].str.contains(exclude_regex, na=False),
+        (~tx["target"].str.contains(exclude_regex, na=False) if exclude_regex else pd.Series(True, index=tx.index)
+        ) & ~tx["target"].isin(neg_probes),
         "target"
     ].unique().tolist()
     #print(f"RNA probes: {set(rna_probes)}")
@@ -288,15 +293,25 @@ def main():
         alpha=args.alpha
     )
     # Append to FOV position file
-    fovpos = fovpos.join(fov_snr.set_index("FOV")[["FOV_SNR"]], validate="one_to_one")
+    fovpos = fovpos.join(
+         fov_snr.set_index("FOV")[["FOV_SNR"]].reindex(fovpos.index, fill_value=0.0),
+         validate="one_to_one",
+     )
     if fovpos["FOV_SNR"].isna().any():
         raise ValueError("Missing or undefined FOV SNR values")
     print(fovpos.sort_values('FOV_SNR'))
 
+    # Retrieve FOV dimensions (saved by Ashlar or by assembleFOVs.py)
+    with open(args.tile_size) as f:
+        tile_width, tile_height = map(int, f.read().strip().split(","))
+    
+    if tile_width <= 0 or tile_height <= 0:
+        raise ValueError("FOV dimensions must be positive")
+
     # Use above SNR values to filter transcripts in overlapping FOV areas
     # (this avoids duplication of transcripts detected in 2 FOVs)
     print("Filtering transcripts in overlapping FOV regions based on pseudo-SNR")
-    tx = filter_overlap_tx(tx, fovpos, tile_width=4256, tile_height=4256)
+    tx = filter_overlap_tx(tx, fovpos, tile_width=tile_width, tile_height=tile_height)
 
     # Define indices of transcripts for main, control, and other categories based on regex patterns
     print("Splitting transcripts file by regex patterns for main, control, and other probes")
@@ -312,18 +327,24 @@ def main():
     )
     idx_main = ~idx_ctrl & ~idx_other
 
-    # Create PointsModel objects for each category of transcripts
+    # Create PointsModel objects for main and control transcripts
     points = {
         "main": spd.models.PointsModel.parse(
-            tx.loc[idx_main], feature_key="target", coordinates={"x": "x", "y": "y"}
+            tx.loc[idx_main], feature_key="target",
+            coordinates={"x": "x", "y": "y"}
         ),
         "ctrl": spd.models.PointsModel.parse(
-            tx.loc[idx_ctrl], feature_key="target", coordinates={"x": "x", "y": "y"}
-        ),
-        "other": spd.models.PointsModel.parse(
-            tx.loc[idx_other], feature_key="target", coordinates={"x": "x", "y": "y"}
+            tx.loc[idx_ctrl], feature_key="target",
+            coordinates={"x": "x", "y": "y"}
         ),
     }
+
+    # Only create the 'other' element when a regex is specified
+    if args.other_regex:
+        points["other"] = spd.models.PointsModel.parse(
+            tx.loc[idx_other], feature_key="target",
+            coordinates={"x": "x", "y": "y"}
+        )
 
     # If a polygon CSV is provided, read it and create a ShapesModel object
     if args.pg_csv is not None:
