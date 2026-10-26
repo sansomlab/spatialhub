@@ -5,6 +5,7 @@ import geopandas as gpd
 import tifffile
 import spatialdata as spd
 from scipy.spatial import cKDTree
+from shapely.geometry import box
 
 from argparse import ArgumentParser as AP
 from shapely import Polygon
@@ -198,6 +199,45 @@ def filter_overlap_tx(
     return transcripts.iloc[np.flatnonzero(keep)].copy()
 
 
+def create_fov_shapes(fovpos, tile_width, tile_height):
+    """
+    Create square FOV polygons in stitched image coordinates.
+
+    Parameters
+    ----------
+    fovpos : pd.DataFrame
+        FOV-indexed DataFrame containing Position_X and Position_Y.
+    tile_width, tile_height : int
+        Original FOV dimensions in pixels.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        One polygon per FOV, indexed by FOV.
+    """
+    if not fovpos.index.is_unique:
+        raise ValueError("Duplicate FOV identifiers")
+
+    polygons = [
+        box(
+            x,
+            y,
+            x + tile_width,
+            y + tile_height,
+        )
+        for x, y in zip(
+            fovpos["Position_X"],
+            fovpos["Position_Y"],
+        )
+    ]
+
+    return gpd.GeoDataFrame(
+        geometry=polygons,
+        index=fovpos.index.rename("FOV"),
+        crs=None,
+    )
+
+
 def main():
     p = AP(description="Prepare a Zarr object from CosMx data.")
     # Required arguments
@@ -346,7 +386,21 @@ def main():
             coordinates={"x": "x", "y": "y"}
         )
 
-    # If a polygon CSV is provided, read it and create a ShapesModel object
+
+    ### Prepare Shapes ###
+
+    # Create FOV boundaries using stitched image coordinates
+    fov_shapes = create_fov_shapes(
+        fovpos,
+        tile_width=tile_width,
+        tile_height=tile_height,
+    )
+    fov_shapes["pseudoSNR"] = fovpos["FOV_SNR"]
+
+    # Always include FOV boundaries
+    shapes = { "fov_boundaries": spd.models.ShapesModel.parse(fov_shapes) }
+
+    # If a polygon CSV is provided, read it and further add a ShapesModel object
     if args.pg_csv is not None:
         print("Importing polygon CSV file")
         pg = pd.read_csv(args.pg_csv, header=0)
@@ -368,9 +422,7 @@ def main():
             print(f"{YELLOW}Warning: {nsk} segments have insufficient points.{RESET}")
         gdf = gpd.GeoDataFrame(segments, geometry="geometry", crs=None)
         gdf.set_index("cell_id", inplace=True)
-        shapes = {"atomx_segments": spd.models.ShapesModel.parse(gdf)}
-    else:
-        shapes = None
+        shapes["atomx_segments"]=spd.models.ShapesModel.parse(gdf)
 
     spd.SpatialData(images=images, points=points, shapes=shapes).write(args.output)
 
