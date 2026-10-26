@@ -88,6 +88,7 @@ rule make_zarr:
             else ""
         ),
         scales=(f"--scales {config['scales']}" if config.get("scales") else ""),
+        alpha=(f"--alpha {config['alpha']}" if config.get("alpha") else ""),
     shell:
         """
         python -m spatialhub.scripts.cosmx_makeZarr \
@@ -99,5 +100,6 @@ rule make_zarr:
             {params.ctrl_regex} \
             {params.other_regex} \
             {params.scales} \
+            {params.alpha} \
             {output} >{log} 2>&1
         """

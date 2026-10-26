@@ -13,6 +13,9 @@ outdir: /path/to/output/directory
 ctrl_regex: SystemControl|Negative
 other_regex: Bact|Heli|16S
 
+# Pseudocount for SNR calculation (default: 3)
+alpha: 3.0
+
 # Image parameters
 channel_names: PanCK,CD68,Membrane,CD45,DNA
 scales: 2,8
