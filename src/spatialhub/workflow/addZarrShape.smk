@@ -78,7 +78,11 @@ rule add_shapes:
     params:
         shpdir=lambda wc, input: os.path.join(input.zarr_path, "shapes", SHAPE_KEY),
         shapekey=SHAPE_KEY,
-        index=config.get("geojson_index", "index"),
+        index=lambda wc: (
+            "index"
+            if SHAPE_DICT[wc.smp].lower().endswith((".tif", ".tiff"))
+            else config.get("geojson_index", "index")
+        ),
     shell:
         """
         rmdir {params.shpdir:q}
