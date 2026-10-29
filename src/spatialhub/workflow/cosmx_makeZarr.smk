@@ -58,8 +58,14 @@ rule full:
 rule make_zarr:
     input:
         fov_csv=os.path.join(IMAGE_DIR, "{smp}", "FOV.positions.csv"),
+        size_txt=os.path.join(IMAGE_DIR, "{smp}", "FOV.size.px.txt"),
         tx_csv=lambda wc: task_dict[wc.smp]["tx_csv"],
         morph_tiff=os.path.join(IMAGE_DIR, "{smp}", "image.ome.tiff"),
+        pg_csv=lambda wc: (
+            [task_dict[wc.smp]["pg_csv"]]
+            if task_dict[wc.smp].get("pg_csv")
+            else []
+        ),
     output:
         directory(os.path.join(ZARR_DIR, "{smp}.zarr")),
     log:
@@ -67,11 +73,11 @@ rule make_zarr:
     resources:
         **RESOURCES,
     params:
-        pg_csv=lambda wc: (
-            f"--pg-csv {task_dict[wc.smp]['pg_csv']}"
-            if task_dict[wc.smp].get("pg_csv")
+        pg_csv=lambda wc, input: (
+            f"--pg-csv {input.pg_csv[0]}"
+            if input.pg_csv
             else ""
-        ),
+        ),              
         chnames=(
             f"--channels {config['channel_names']}"
             if config.get("channel_names")
@@ -88,16 +94,23 @@ rule make_zarr:
             else ""
         ),
         scales=(f"--scales {config['scales']}" if config.get("scales") else ""),
+        alpha=(
+            f"--alpha {config['alpha']}"
+            if config.get("alpha") is not None
+            else ""
+        ),
     shell:
         """
         python -m spatialhub.scripts.cosmx_makeZarr \
             --fov-csv {input.fov_csv} \
             --tx-csv {input.tx_csv} \
             --morph-tiff {input.morph_tiff} \
+            --tile-size {input.size_txt} \
             {params.pg_csv} \
             {params.chnames} \
             {params.ctrl_regex} \
             {params.other_regex} \
             {params.scales} \
+            {params.alpha} \
             {output} >{log} 2>&1
         """

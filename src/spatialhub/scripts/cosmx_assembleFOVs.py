@@ -74,6 +74,15 @@ def main():
             raise ValueError(f"FOV{fov} dimension mismatch: got {d}, expected {edim}")
     fov_height, fov_width = int(edim[1]), int(edim[2])
 
+    # Save FOV dimensions (width, height) in pixels
+    fov_height, fov_width = int(edim[1]), int(edim[2])
+
+    out_size = os.path.join(args.outdir, "FOV.size.txt")
+    with open(out_size, "w") as f:
+        f.write(f"{fov_width},{fov_height}\n")
+
+    print(f"FOV dimensions: {fov_width} x {fov_height} pixels")
+
     # Calculate the mosaic dimensions based on the FOV positions
     ## The FOV coordinates are given as the upper-left corner of the FOV,
     ## but the FOVs are arranged from the lower-left corner of the mosaic.
