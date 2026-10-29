@@ -1,0 +1,15 @@
+resources:
+    account: slurm_account
+    threads: 16
+    mem_mb: 96000
+    time: "04:00:00"
+    partition: short
+
+geojson_dir: /users/sansom/vlw740/work/Psoriasis/newbatch/geojson.dir
+zarr_dir: /users/sansom/vlw740/work/Psoriasis/newbatch/zarr.dir
+shape_key: cellpose_segments
+geojson_index: index # the index column name in the geojson file
+
+shapes2add:
+    sample1: /path/to/sample1/shape/to/be/added.tif
+    sample2: /path/to/sample2/shape/to/be/added.geojson
