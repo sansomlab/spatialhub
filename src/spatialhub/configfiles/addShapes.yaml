@@ -1,14 +1,25 @@
+# Resource names follow the conventions of the Slurm executor plugins:
+# slurm_account, slurm_partition, runtime  ( in minutes ) and mem_mb
+
+# Resources for CPU rules
 resources:
-    slurm_account: slurm_account
-    threads: 16
-    mem_mb: 96000
-    time: "04:00:00"
+    slurm_account: slurm_account     # replace with your Slurm account
     slurm_partition: short
+    threads: 4
+    mem_mb: 16000
+    runtime: 240
+
+# Resources for GPU rules (CellPose). Any key here overrides the value above
+# If you to run this on GH200 partitions/gpus 
+#   ( gpu_kir / gpu_gh200_bmrc ) run the workflow from an 
+#   aarch64 virtual environment with matching pytorch and torchvision
 
 gpu_resources:
-    slurm_partition: gpu_a100_40gb       # your actual GPU partition name
-    n_gpus: 1                        # becomes --gres=gpu:1
-    # gres_cmd: "--gpus-per-node 1"  # override to use gpus-per-node instead
+    slurm_partition: gpu_partition # your actual GPU partition name
+    n_gpus: 1                      # requested as gres gpu:<n_gpus>
+    threads: 16
+    mem_mb: 96000
+    runtime: 240
 
 zarr_dir: /path/to/zarr/directory
 
