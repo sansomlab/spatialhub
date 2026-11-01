@@ -4,41 +4,43 @@ import os
 configfile: "addShapes.yaml"
 
 
+# 'full' only aggregates outputs and optionally locks them, so it runs where the
+# workflow was started rather than as a cluster job. This also avoids sending it
+# to a partition whose CPU architecture differs from the submitting environment.
+localrules:
+    full,
+
+
 # [NOTE] this key is set by the CLI, not the config file!
 if "lock" in config:
     LOCK = config["lock"].lower()
 else:
     LOCK = "false"
 
-# Base resources, in native-Slurm dialect (slurm_partition / slurm_account).
-# gres_cmd defaults to "" so the CLI's {resources.gres_cmd} template substitutes
-# cleanly on CPU rules (DRMAA requires the key present on every rule).
+# This workflow runs on the native Slurm executor (see WORKFLOWS in cli.py),
+# because slurm-drmaa cannot submit GPU requests to the BMRC GPU partitions.
+# Resource names therefore follow the native executor's conventions:
+#   slurm_account, slurm_partition, runtime (minutes), mem_mb, gres.
+# Threads are set per rule via `threads:`, not as a resource.
+
+# Base (CPU) resources.
 RESOURCES = {
     "threads": 4,
     "mem_mb": 16000,
-    "time": "04:00:00",
+    "runtime": 240,
     "slurm_partition": "short",
-    "gres_cmd": "",
 }
 RESOURCES.update(config.get("resources", {}))
-RESOURCES.setdefault("gres_cmd", "")
+THREADS = RESOURCES.pop("threads")
 
-# Transitional shim: the shared DRMAA submission string still references the
-# legacy {resources.partition}/{resources.account} names. Populate those from a
-# single native-dialect source so one config value drives both, with no
-# duplicate key in the YAML to drift. After migration to the native executor,
-# it reads slurm_partition / slurm_account directly and these two lines go away.
-RESOURCES["partition"] = RESOURCES["slurm_partition"]
-RESOURCES["account"] = RESOURCES.get("slurm_account", "")
-
-# GPU resources: inherit the base, override partition (both names), add GRES.
-_gpu_cfg = config.get("gpu_resources", {})
-GPU_RESOURCES = dict(RESOURCES)
-_gpu_part = _gpu_cfg.get("slurm_partition", RESOURCES["slurm_partition"])
-GPU_RESOURCES["slurm_partition"] = _gpu_part
-GPU_RESOURCES["partition"] = _gpu_part
-_n_gpus = _gpu_cfg.get("n_gpus", 1)
-GPU_RESOURCES["gres_cmd"] = _gpu_cfg.get("gres_cmd", f"--gres=gpu:{_n_gpus}")
+# GPU resources: start from the base, then apply any overrides from the
+# gpu_resources block (partition, account, threads, memory, runtime, ...).
+# n_gpus becomes the gres request unless a full gres string is given.
+_gpu_cfg = dict(config.get("gpu_resources", {}))
+_n_gpus = _gpu_cfg.pop("n_gpus", 1)
+GPU_THREADS = _gpu_cfg.pop("threads", THREADS)
+GPU_RESOURCES = {**RESOURCES, **_gpu_cfg}
+GPU_RESOURCES.setdefault("gres", f"gpu:{_n_gpus}")
 
 FILE_LST = [f for f in os.listdir(config["zarr_dir"]) if f.endswith(".zarr")]
 
@@ -56,6 +58,7 @@ rule full:
             fname=FILE_LST,
             shape=[KEY_DICT[shape] for shape in SHAPES_TO_ADD.keys()],
         ),
+    threads: THREADS
     resources:
         **RESOURCES,
     params:
@@ -81,6 +84,7 @@ rule add_cellpose:
         ),
     log:
         os.path.join(config["zarr_dir"], "{fname}.addShapeCellpose.log"),
+    threads: GPU_THREADS
     resources:
         **GPU_RESOURCES,
     params:

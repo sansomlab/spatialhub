@@ -18,47 +18,76 @@ RESET = "\033[0m"
 
 PLACEHOLDER_ACCOUNT = "slurm_account"
 
+# Executors whose configs use native Slurm resource names.
+NATIVE_NAME_EXECUTORS = ("slurm-drmaa", "slurm")
+
 # Single source of truth for available workflows.
-# name -> (one-line summary, [steps])
+#
+# executor:
+#   "drmaa" - submitted through the DRMAA executor (CPU workflows).
+#   "slurm-drmaa" - submitted through snakemake-executor-plugin-slurm-drmaa,
+#             which builds job options from each rule's resources and supports
+#             GPU requests.
+#   "slurm" - submitted through the native Slurm executor plugin.
+#   Configs for "slurm-drmaa" and "slurm" workflows use native resource names:
+#   slurm_account, slurm_partition, runtime (minutes) and gres.
 WORKFLOWS = {
-    "cosmx_makeImage": (
-        "Generate one image file per CosMx sample from raw FOV data.",
-        [
+    "cosmx_makeImage": {
+        "summary": "Generate one image file per CosMx sample from raw FOV data.",
+        "steps": [
             "with Ashlar (stitching FOVs): genBlankFOV -> completeGrid -> runAshlar",
-            "without Ashlar (appending FOVs without resolving overlaps at boundaries): assembleFOVs",
+            "without Ashlar (appending FOVs without resolving overlaps at "
+            "boundaries): assembleFOVs",
         ],
-    ),
-    "cosmx_makeZarr": (
-        "Generate one Zarr file per CosMx sample from compiled image and raw transcripts data.",
-        [],
-    ),
-    "visiumhd_makeZarr": (
-        "Generate one Zarr file per Visium HD capture area from FASTQ and images.",
-        ["Space Ranger count", "Zarr generation"],
-    ),
-    "visiumhd_prepareBin2Cell": (
-        "Generate intermediate files up to the StarDist step of Bin2Cell.",
-        [],
-    ),
-    "extractH5AD": (
-        "Build an AnnData (H5AD) from a SpatialData (Zarr) when a table already "
-        "exists (typically Visium HD).",
-        [],
-    ),
-    "aggregateH5AD": (
-        "Build an AnnData (H5AD) from a SpatialData (Zarr) when no table exists, "
-        "by aggregating points and shapes (typically CosMx).",
-        [],
-    ),
-    "runRCTD": (
-        "Deconvolve cell-type abundances against a single-cell reference using RCTD.",
-        [],
-    ),
-    "runCell2Location": (
-        "Deconvolve cell-type abundances against a single-cell reference using "
-        "Cell2Location.",
-        [],
-    ),
+        "executor": "drmaa",
+    },
+    "cosmx_makeZarr": {
+        "summary": "Generate one Zarr file per CosMx sample from compiled image "
+        "and raw transcripts data.",
+        "steps": [],
+        "executor": "drmaa",
+    },
+    "visiumhd_makeZarr": {
+        "summary": "Generate one Zarr file per Visium HD capture area from FASTQ "
+        "and images.",
+        "steps": ["Space Ranger count", "Zarr generation"],
+        "executor": "drmaa",
+    },
+    "visiumhd_prepareBin2Cell": {
+        "summary": "Generate intermediate files up to the StarDist step of Bin2Cell.",
+        "steps": [],
+        "executor": "drmaa",
+    },
+    "extractH5AD": {
+        "summary": "Build an AnnData (H5AD) from a SpatialData (Zarr) when a table "
+        "already exists (typically Visium HD).",
+        "steps": [],
+        "executor": "drmaa",
+    },
+    "aggregateH5AD": {
+        "summary": "Build an AnnData (H5AD) from a SpatialData (Zarr) when no table "
+        "exists, by aggregating points and shapes (typically CosMx).",
+        "steps": [],
+        "executor": "drmaa",
+    },
+    "addShapes": {
+        "summary": "Add shape layers (Cellpose cell segmentation, FOV boxes) to "
+        "existing SpatialData (Zarr) files. Uses GPUs.",
+        "steps": [],
+        "executor": "slurm-drmaa",
+    },
+    "runRCTD": {
+        "summary": "Deconvolve cell-type abundances against a single-cell reference "
+        "using RCTD.",
+        "steps": [],
+        "executor": "drmaa",
+    },
+    "runCell2Location": {
+        "summary": "Deconvolve cell-type abundances against a single-cell reference "
+        "using Cell2Location.",
+        "steps": [],
+        "executor": "drmaa",
+    },
 }
 
 
@@ -71,8 +100,8 @@ def workflows_help():
     """
     width = max(len(name) for name in WORKFLOWS)
     lines = ["[bold]Available workflows:[/]", ""]
-    for name, (summary, _steps) in WORKFLOWS.items():
-        lines.append(f"  [bold cyan]{name:<{width}}[/]  {summary}")
+    for name, info in WORKFLOWS.items():
+        lines.append(f"  [bold cyan]{name:<{width}}[/]  {info['summary']}")
     lines.append("")
     lines.append("Run a workflow with:  [bold]spatialhub <workflow> <task>[/]")
     lines.append("  <task> is one of: config | full | <rulename>")
@@ -128,13 +157,18 @@ def get_valid_slurm_accounts():
     return accounts or None
 
 
+def _config_error(message):
+    print(f"{RED}[ERROR] {message}{RESET}")
+    raise SystemExit(1)
+
+
 def _account_error(message):
     print(f"{RED}[ERROR] {message}{RESET}")
     default_account = get_default_slurm_account()
     if default_account:
         print(
             f"{YELLOW}[HINT] Your default Slurm account appears to be "
-            f"'{default_account}'. Set 'resources.account' in the workflow "
+            f"'{default_account}'. Set 'resources.slurm_account' in the workflow "
             f"config accordingly.{RESET}"
         )
     else:
@@ -148,28 +182,40 @@ def _account_error(message):
 def validate_config(workflow):
     """Pre-flight check of the workflow config before Snakemake is invoked.
 
-    Validates that the Slurm account is set to a real account rather than the
-    template placeholder, so failures surface here rather than inside a verbose
-    Snakemake/DRMAA traceback. Reads either naming dialect (slurm_account or
-    account) during the transition to native-Slurm resource names.
+    Surfaces common configuration mistakes here rather than inside a verbose
+    Snakemake traceback:
+      - the Slurm account is missing or still the template placeholder;
+      - for native-Slurm workflows, legacy key names that the native executor
+        silently ignores ('account' instead of 'slurm_account', 'time' instead
+        of 'runtime').
     """
+    executor = WORKFLOWS[workflow]["executor"]
     config_path = Path.cwd().joinpath(f"{workflow}.yaml")
     if not config_path.exists():
-        print(
-            f"{RED}[ERROR] Config file '{config_path.name}' not found in the "
-            f"current directory. Run '{workflow} config' to create it.{RESET}"
+        _config_error(
+            f"Config file '{config_path.name}' not found in the current directory. "
+            f"Run 'spatialhub {workflow} config' to create it."
         )
-        raise SystemExit(1)
 
     with config_path.open() as fh:
         config = yaml.safe_load(fh) or {}
 
     resources = config.get("resources") or {}
-    account = resources.get("slurm_account") or resources.get("account")
+
+    if executor in NATIVE_NAME_EXECUTORS:
+        if not resources.get("slurm_account") and resources.get("account"):
+            _config_error(
+                f"'{workflow}' runs on the {executor} executor, which reads "
+                f"'slurm_account', not 'account'. Rename the key under 'resources' "
+                f"in {config_path.name}."
+            )
+        account = resources.get("slurm_account")
+    else:
+        account = resources.get("slurm_account") or resources.get("account")
 
     if not account:
         _account_error(
-            f"No Slurm account set under 'resources' (slurm_account) in "
+            f"No Slurm account set under 'resources.slurm_account' in "
             f"{config_path.name}."
         )
 
@@ -178,6 +224,16 @@ def validate_config(workflow):
             f"The Slurm account in {config_path.name} is still the template "
             f"placeholder '{PLACEHOLDER_ACCOUNT}'. Assign a valid Slurm account."
         )
+
+    if executor in NATIVE_NAME_EXECUTORS:
+        for section in ("resources", "gpu_resources"):
+            block = config.get(section) or {}
+            if "time" in block and "runtime" not in block:
+                _config_error(
+                    f"'{section}.time' in {config_path.name} is not read by the "
+                    f"{executor} executor. Replace it with 'runtime' in minutes "
+                    f"(for example, runtime: 240 for 4 hours)."
+                )
 
     valid_accounts = get_valid_slurm_accounts()
     if valid_accounts is not None and account not in valid_accounts:
@@ -201,7 +257,7 @@ def copy_config_file(module):
         raise FileExistsError()
 
 
-def run_snakemake(smkpath, task, cores, jobs, dry_run, lock):
+def run_snakemake(smkpath, task, cores, jobs, dry_run, lock, executor):
     cmd = [
         "snakemake",
         "--snakefile",
@@ -213,15 +269,28 @@ def run_snakemake(smkpath, task, cores, jobs, dry_run, lock):
         "-p",
     ]
     cmd.extend(["--config", f"lock={str(lock).lower()}"])
-    cmd.extend(["--executor", "drmaa"])
-    drmaa_args = (
-        " -A {resources.account} -p {resources.partition} "
-        + "--mem={resources.mem_mb} --cpus-per-task={threads} --time={resources.time} "
-        + "{resources.gres_cmd} "
-        + "--output=logs/job_%j.out --error=logs/job_%j.err "
-    )
-    log_dir = "logs"
-    cmd.extend(["--drmaa-args", drmaa_args, "--drmaa-log-dir", log_dir])
+
+    if executor == "drmaa":
+        cmd.extend(["--executor", "drmaa"])
+        drmaa_args = (
+            " -A {resources.account} -p {resources.partition} "
+            + "--mem={resources.mem_mb} --cpus-per-task={threads} --time={resources.time} "
+            + "--output=logs/job_%j.out --error=logs/job_%j.err "
+        )
+        log_dir = "logs"
+        cmd.extend(["--drmaa-args", drmaa_args, "--drmaa-log-dir", log_dir])
+    elif executor == "slurm-drmaa":
+        # The slurm-drmaa executor builds each job's options from its resources
+        # (slurm_account, slurm_partition, runtime, mem_mb, threads, gres).
+        cmd.extend(["--executor", "slurm-drmaa", "--slurm-drmaa-log-dir", "logs"])
+    elif executor == "slurm":
+        # The native executor reads slurm_account, slurm_partition, runtime,
+        # mem_mb, threads and gres from each rule's resources directly, and
+        # writes job logs under .snakemake/slurm_logs/.
+        cmd.extend(["--executor", "slurm"])
+    else:
+        raise ValueError(f"Unknown executor '{executor}'.")
+
     if dry_run:
         cmd.append("--dry-run")
     cmd.extend([task])
@@ -256,6 +325,7 @@ def main():
 
     # Determine the path to the Snakefile
     smkpath = files("spatialhub").joinpath("workflow", f"{args.workflow}.smk")
+    executor = WORKFLOWS[args.workflow]["executor"]
 
     if args.lock and args.task == "config":
         print(f"{GREEN}[INFO] `--lock` is ignored when running config task.{RESET}")
@@ -271,6 +341,7 @@ def main():
             str(args.jobs),
             args.dry,
             str(args.lock).lower(),
+            executor,
         )
 
     print(f"{GREEN}Completed successfully!{RESET}")
