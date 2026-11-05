@@ -1,6 +1,6 @@
 #!/usr/bin/Rscript --vanilla
 
-# This script flags cells, samples and FOVs (if applicable) that failed QC.
+# This script flags instances, samples and FOVs (if applicable) that failed QC.
 # Threshold for pass/fail are defined by the user in a YAML file.
 # All QC metrics were pre-computed in prior scripts.
 
@@ -58,118 +58,154 @@ option_list <- list(
 )
 
 opt <- parse_args(OptionParser(option_list=option_list))
-
 cat("Running with options:\n")
 print(opt)
 
 qc <- yaml::read_yaml(opt$qc_thresholds)
 
-
+if (opt$runBrukerFOVqc && !opt$runFOVqc) {
+  stop("Bruker FOV QC requires FOV QC to be enabled")
+}
 
 
 # --------- Setup ----------
 
+read_qc_tables <- function(pattern) {
+  paths <- list.files(
+    opt$run_dir, pattern = pattern, full.names = TRUE
+  )
+  if (!length(paths)) {
+    stop("No QC files found matching: ", pattern)
+  }
+  data.table::rbindlist(lapply(paths, data.table::fread))
+}
+
 # Import QC tables for all samples and append at project level
-message("Importing cell QC metrics tables.")
-qc_tables <- list.files(path = opt$run_dir, pattern = "_cellQCmetrics\\.csv$",
-                        full.names = TRUE)
-if (length(qc_tables) == 0) {
-  stop("No cell QC metrics tables found in the specified run directory.")
-} else {
-  qc_cell <- rbindlist(lapply(qc_tables, fread))
+message("Importing instance-level QC tables.")
+qc_instance <- read_qc_tables("_instanceQCmetrics\\.csv$")
+instance_meta <- read_qc_tables("_instanceMetadata\\.csv$")
+
+if (anyDuplicated(qc_instance[, c("sample_id", "instance_id")]) ||
+    anyDuplicated(instance_meta[, c("sample_id", "instance_id")])) {
+  stop("Duplicate sample_id x instance_id combinations")
+}
+if (opt$runFOVqc && !"FOV" %in% names(instance_meta)) {
+  stop(
+    "FOV QC enabled but instance metadata has no FOV assignments"
+  )
 }
 
-message("Importing cell metadata tables.")
-meta <- list.files(path = opt$run_dir, pattern = "_cellMetadata\\.csv$",
-                   full.names = TRUE)
-if (length(meta) == 0) {
-  stop("No cell QC metadata tables found in the specified run directory.")
-} else {
-  qc_meta <- rbindlist(lapply(meta, fread))
-  #qc_meta <- qc_meta |> dplyr::select(sample_id, instance_id, FOV)
-}
-stopifnot(
-  nrow(qc_meta) == nrow(dplyr::distinct(qc_meta, sample_id, instance_id))
-)
-qc_cell <- dplyr::left_join(qc_cell, qc_meta, by = c("sample_id", "instance_id"))
+qc_instance <- dplyr::left_join(qc_instance, instance_meta, by = c("sample_id", "instance_id"))
 
-
+# Import FOV QC metrics if applicable
 if(opt$runFOVqc) {
-  message("FOV QC was enabled for this run. Importing FOV QC metrics tables.")
-  qc_tables <- list.files(path = opt$run_dir, pattern = "_fovQCmetrics\\.csv$",
-                          full.names = TRUE)
-  if (length(qc_tables) == 0) {
-    stop("No FOV QC metrics tables found in the specified run directory. Please run FOV QC to generate these.")
-  } else {
-    qc_fov <- rbindlist(lapply(qc_tables, fread))
+  message("FOV QC was enabled for this run. Importing FOV QC metrics table.")
+  qc_fov <- read_qc_tables("_fovQCmetrics\\.csv$")
+  if (anyDuplicated(qc_fov[, c("sample_id", "FOV")])) {
+    stop("Duplicate sample_id x FOV combinations")
   }
 }
 
-message("Importing sample QC metrics tables.")
-qc_tables <- list.files(path = opt$run_dir, pattern = "_sampleQCmetrics.csv",
-                        full.names = TRUE)
-if (length(qc_tables) == 0) {
-  stop("No sample QC metrics tables found in the specified run directory.")
-} else {
-  qc_sample <- rbindlist(lapply(qc_tables, fread))
-  sample_vars <- names(qc_sample)
-}
+# Import spatialhub and potential user-defined, sample-level metadata table
+message("Importing sample QC metrics table.")
+qc_sample <- read_qc_tables("_sampleQCmetrics\\.csv$")
 
 message("Importing user-defined sample-level metadata.")
-qc_meta <- read.csv(opt$metadata_file, header = TRUE)
-# Subset to included samples
-qc_meta <- qc_meta[qc_meta$sample_id %in% qc_sample$sample_id, ]
-stopifnot(
-  nrow(qc_meta) == nrow(dplyr::distinct(qc_meta, sample_id))
-)
-qc_sample <- dplyr::left_join(qc_sample, qc_meta, by = c("sample_id"))
+sample_meta <- data.table::fread(opt$metadata_file)
+sample_meta <- sample_meta |>
+  dplyr::filter(sample_id %in% qc_sample$sample_id)
+
+if (anyDuplicated(sample_meta$sample_id) ||
+    anyDuplicated(qc_sample$sample_id)) {
+  stop("Duplicate sample_id in sample-level metadata or QC metrics")
+}
 
 
-### Add cell-level QC flags
+### Add instance-level QC flags
 
-message("Adding cell-level QC flags.")
-qc_cell$qcFlagCell_nCount <- ifelse(qc_cell$nCount_RNA >= qc$cell_nCount_cutoff, "Pass", "Fail")
-qc_cell$qcFlagCell_nFeature <- ifelse(qc_cell$nFeature_RNA >= qc$cell_nFeature_cutoff, "Pass", "Fail")
-qc_cell$qcFlagCell_percentNeg <- ifelse(qc_cell$percentNegCounts < qc$cell_percentNeg_cutoff, "Pass", "Fail")
-qc_cell$qcFlagCell_complex <- ifelse(qc_cell$complexity > qc$cell_complexity_cutoff, "Pass", "Fail")
-
-cell_pass_qc <- qc_cell$nCount_RNA >= qc$cell_nCount_cutoff &
-  qc_cell$nFeature_RNA >= qc$cell_nFeature_cutoff &
-  qc_cell$percentNegCounts < qc$cell_percentNeg_cutoff &
-  qc_cell$complexity > qc$cell_complexity_cutoff
-qc_cell$qcFlagCell_summary <- ifelse(cell_pass_qc, "Pass", "Fail")
+message("Adding instance-level QC flags.")
+qc_instance <- qc_instance |>
+  dplyr::mutate(
+    qcFlagInstance_nCount = ifelse(
+      !is.na(nCount_RNA) & nCount_RNA >= qc$instance_nCount_cutoff,
+      "Pass", "Fail"
+    ),
+    qcFlagInstance_nFeature = ifelse(
+      !is.na(nFeature_RNA) & nFeature_RNA >= qc$instance_nFeature_cutoff,
+      "Pass", "Fail"
+    ),
+    qcFlagInstance_percentNeg = ifelse(
+      !is.na(percentNegCounts) &
+        percentNegCounts < qc$instance_percentNeg_cutoff,
+      "Pass", "Fail"
+    ),
+    qcFlagInstance_complex = ifelse(
+      !is.na(complexity) &
+        complexity > qc$instance_complexity_cutoff,
+      "Pass", "Fail"
+    )
+  ) |>
+  dplyr::mutate(
+    qcFlagInstance_summary = ifelse(
+      qcFlagInstance_nCount == "Pass" &
+        qcFlagInstance_nFeature == "Pass" &
+        qcFlagInstance_percentNeg == "Pass" &
+        qcFlagInstance_complex == "Pass",
+      "Pass", "Fail"
+    )
+  )
 
 
 ### Add FOV-level QC flags
 
-dfc <- qc_cell
+dfc <- qc_instance
 
 if(opt$runFOVqc) {
 
   message("Adding FOV-level QC flags.")
-  qc_fov$qcFlagFOV_nCount <- ifelse(qc_fov$nCount_RNA_FOVavg >= qc$fov_nCount_cutoff, "Pass", "Fail")
-  qc_fov$qcFlagFOV_SNR <- ifelse(qc_fov$FOV_SNR > qc$fov_SNR_cutoff, "Pass", "Fail")
+  qc_fov <- qc_fov |>
+    dplyr::mutate(
+      qcFlagFOV_nCount = ifelse(
+        !is.na(nCount_RNA_FOVavg) &
+          nCount_RNA_FOVavg >= qc$fov_nCount_cutoff,
+        "Pass", "Fail"
+      ),
+      qcFlagFOV_SNR = ifelse(
+        !is.na(FOV_SNR) & FOV_SNR > qc$fov_SNR_cutoff,
+        "Pass", "Fail"
+      )
+    )
 
+  # Summarise FOV QC flags into a single summary flag
+  fov_pass <- (
+    qc_fov$qcFlagFOV_nCount == "Pass" &
+      qc_fov$qcFlagFOV_SNR == "Pass"
+  )
   if (opt$runBrukerFOVqc) {
-  FOV_pass_qc <- qc_fov$nCount_RNA_FOVavg >= qc$fov_nCount_cutoff &
-      qc_fov$FOV_SNR > qc$fov_SNR_cutoff &
+    if (!"qcFlagGeneBias" %in% names(qc_fov)) {
+      stop("Bruker FOV QC enabled but qcFlagGeneBias is missing")
+    }
+    fov_pass <- fov_pass &
+      !is.na(qc_fov$qcFlagGeneBias) &
       qc_fov$qcFlagGeneBias == "Pass"
-  } else {
-  FOV_pass_qc <- qc_fov$nCount_RNA_FOVavg >= qc$fov_nCount_cutoff &
-      qc_fov$FOV_SNR > qc$fov_SNR_cutoff
   }
-  qc_fov$qcFlagFOV_summary <- ifelse(FOV_pass_qc, "Pass", "Fail")
+  qc_fov$qcFlagFOV_summary <- ifelse(fov_pass, "Pass", "Fail")
 
   message("Writing FOV QC metrics table to file.")
-  write.csv(qc_fov, row.names = FALSE, quote = FALSE, 
-            file = paste0(opt$outdir, "/", opt$run_name, "_fovQCmetrics.csv"))
+  data.table::fwrite(
+    qc_fov,
+    file.path(opt$outdir, paste0(opt$run_name, "_fovQCmetrics.csv"))
+  )
 
-  # Append FOV QC flags to cell-level QC table (necessary for sample-level QC)
-  stopifnot( nrow(qc_fov) == nrow(dplyr::distinct(qc_fov, sample_id, FOV)) )
-  dfc <- dplyr::left_join(qc_cell, qc_fov, by = c("sample_id", "FOV"))
+  # Append FOV QC flags to instance-level QC table (necessary for sample-level QC)
+  qc_instance <- dplyr::left_join(
+    qc_instance,
+    qc_fov,
+    by = c("sample_id", "FOV")
+  )
 
-  if (any(is.na(dfc$qcFlagFOV_summary) & !is.na(dfc$FOV))) {
-    stop("Some cells could not be matched to an FOV QC record.")
+  if (anyNA(qc_instance$qcFlagFOV_summary)) {
+    stop("Some instances could not be matched to FOV QC results")
   }
 
 }
@@ -178,83 +214,84 @@ if(opt$runFOVqc) {
 ### Add sample-level QC flags
 
 message("Adding sample-level QC flags.")
-# Note: Sample-level QC requires integration of QC metrics across all (available) levels
-stopifnot( nrow(qc_sample) == nrow(dplyr::distinct(qc_sample, sample_id)) )
-dfa <- dplyr::left_join(dfc, qc_sample, by = c("sample_id"))
+sample_summary <- qc_instance |>
+  dplyr::group_by(sample_id) |>
+  dplyr::summarise(
+    nInstance_sampleSum_passQC =
+      sum(qcFlagInstance_summary == "Pass"),
+    .groups = "drop"
+  )
 
-# Tally the cells that passed QC for each sample
-dfa_ls <- split(dfa, f = dfa$sample_id)
+if (opt$runFOVqc) {
+  fov_summary <- qc_instance |>
+    dplyr::group_by(sample_id) |>
+    dplyr::summarise(
+      nInstancexnFOV_sampleSum_passQC =
+        sum(qcFlagInstance_summary == "Pass" & qcFlagFOV_summary == "Pass"),
+      samplePercentInstancesInFailedFOV =
+        mean(qcFlagFOV_summary == "Fail") * 100,  # mean of logical vector gives proportion
+      .groups = "drop"
+  )
 
-for (sample in names(dfa_ls)) { 
-  df <- dfa_ls[[sample]]
-    
-  # In summary, how many cells for that sample pass QC?
-  # i.e. how many cells have enough counts, etc.
-  sample_cell_pass_qc <- df$qcFlagCell_summary == "Pass"
-  df$nCell_sampleSum_passQC <- sum(sample_cell_pass_qc)
-
-  if (opt$runFOVqc) {
-
-    # Tally the cells that pased *cell* AND *FOV* QC for each sample
-    s <- sum(df$qcFlagFOV_summary == "Fail")
-    df$samplePercentCellsInFailedFOV <- round(s / nrow(df), 4) * 100
-     
-    # In summary, how many cells for that sample pass all QC?
-    # i.e. how many cells have enough counts, etc. AND fall within a high-quality FOV
-    sample_cell_pass_qc <- df$qcFlagCell_summary == "Pass" &
-      df$qcFlagFOV_summary == "Pass"
-    df$nCellxnFOV_sampleSum_passQC <- sum(sample_cell_pass_qc)
-  }
-
-  dfa_ls[[sample]] <- df
-
+  sample_summary <- dplyr::left_join(
+    sample_summary, fov_summary, by = "sample_id"
+  )
 }
-dfa <- do.call(rbind.data.frame, dfa_ls)
 
-if (opt$runFOVqc && qc$exclCellsInFailedFOVs) {
-  # Define summary sample QC metric
-  # i.e. sample with a minimum absolute count of cells and percent of cells passing QC
-  # based on cell QC and FOV QC both
-  dfa$samplePercentCellsPassQC <- round(dfa$nCellxnFOV_sampleSum_passQC/dfa$nCell_sampleSum, 4) * 100
-  sample_pass_qc <- dfa$nCellxnFOV_sampleSum_passQC >= qc$sampleMinCells & dfa$samplePercentCellsPassQC > qc$sampleMinPercent
- } else {
-  # Define summary sample QC metric based on cell QC only
-  dfa$samplePercentCellsPassQC <- round(dfa$nCell_sampleSum_passQC/dfa$nCell_sampleSum, 4) * 100
-  sample_pass_qc <- dfa$nCell_sampleSum_passQC >= qc$sampleMinCells & dfa$samplePercentCellsPassQC > qc$sampleMinPercent
+qc_sample <- dplyr::left_join(
+  qc_sample, sample_summary, by = "sample_id"
+)
+
+
+# Define rule for pass/fail for each sample
+
+# Choose pass count according to the configured FOV policy
+if (opt$runFOVqc && qc$exclInstancesInFailedFOVs) {
+  passing <- qc_sample$nInstancexnFOV_sampleSum_passQC
+} else {
+  passing <- qc_sample$nInstance_sampleSum_passQC
 }
-dfa$qcFlagSample_summary <- ifelse(sample_pass_qc, "Pass", "Fail")
 
-# Reducing data frame back again to one row per sample
-keepVar <- c(sample_vars, 
-             "nCell_sampleSum_passQC", 
-             "nCellxnFOV_sampleSum_passQC", "samplePercentCellsInFailedFOV", 
-             "samplePercentCellsPassQC", "qcFlagSample_summary")
-keepVar <- names(dfa)[names(dfa) %in% keepVar]
-keepVar <- keepVar[keepVar != "FOV"]
-dfs <- dfa |> dplyr::select(all_of(keepVar))
-head(dfs)
-dfs <- dfs[!duplicated(dfs), ]
-dfs <- dfs[!is.na(dfs$sample_id), ]
-rownames(dfs) <- 1:nrow(dfs)
+# Derive percentage accordingly
+qc_sample$samplePercentInstancesPassQC <- ifelse(
+  qc_sample$nInstance_sampleSum > 0,
+  100 * passing / qc_sample$nInstance_sampleSum,
+  NA_real_
+)
 
-message("Writing sample-level QC metrics table to file.")
-write.csv(dfs, row.names = FALSE, quote = FALSE, 
-          file = paste0(opt$outdir, "/", opt$run_name, "_sampleQCmetrics.csv"))
+qc_sample$qcFlagSample_summary <- ifelse(
+  !is.na(qc_sample$samplePercentInstancesPassQC) &
+    passing >= qc$sampleMinInstances &
+    qc_sample$samplePercentInstancesPassQC > qc$sampleMinPercent,
+  "Pass", "Fail"
+)
+
+data.table::fwrite(
+  qc_sample,
+  file.path(opt$outdir, paste0(opt$run_name, "_sampleQCmetrics.csv"))
+)
 
 
 ### Writing final QC pass/fail decision rule
 
 # REMINDER: We don't filter FOVs altogether to avoid patchy samples.
 # Poor quality FOVs are excluded at the sample level.
-dfa$qcFlagOverall_summary <- ifelse(
-    dfa$qcFlagCell_summary == "Pass" &
-    dfa$qcFlagSample_summary == "Pass",
-    "Pass", "Fail"
+qc_instance <- dplyr::left_join(
+  qc_instance,
+  qc_sample,
+  by = "sample_id"
+)
+qc_instance$qcFlagOverall_summary <- ifelse(
+  qc_instance$qcFlagInstance_summary == "Pass" &
+    qc_instance$qcFlagSample_summary == "Pass",
+  "Pass", "Fail"
 )
 
-message("Writing *enriched* cell QC metrics table to file.")
-write.csv(dfa, row.names = FALSE, quote = FALSE, 
-          file = paste0(opt$outdir, "/", opt$run_name, "_cellQCmetrics.csv"))
+message("Writing *enriched* instance QC metrics table to file.")
+data.table::fwrite(
+  qc_instance,
+  file.path(opt$outdir, paste0(opt$run_name, "_instanceQCmetrics.csv"))
+)
 
 
 

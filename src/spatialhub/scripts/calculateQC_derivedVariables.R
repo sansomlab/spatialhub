@@ -10,9 +10,8 @@ timestamp()
 
 stopifnot(
   require(optparse),
-  require(tidyverse),
-  require(data.table),
-  require(plyr)
+  require(dplyr),
+  require(data.table)
 )
 
 
@@ -37,8 +36,6 @@ option_list <- list(
 )
 
 opt <- parse_args(OptionParser(option_list=option_list))
-set.seed(123456789)
-
 cat("Running with options:\n")
 print(opt)
 
@@ -47,50 +44,57 @@ print(opt)
 
 # --------- Setup ----------
 
-cellQC_file <- paste0(opt$run_dir, "/", opt$sample_id, "_cellQCmetrics.csv")
-stopifnot("file not found" = file.exists(cellQC_file))
-df0 <- read.csv(cellQC_file, header = TRUE)
+instanceQC_file <- paste0(opt$run_dir, "/", opt$sample_id, "_instanceQCmetrics.csv")
+stopifnot("Instance QC metrics file not found" = file.exists(instanceQC_file))
+df0 <- data.table::fread(instanceQC_file)
 
+if (anyDuplicated(df0$instance_id)) {
+  stop("Duplicate instance_id values in instance QC metrics")
+}
+
+# Import optional FOV-level metadata if applicable
 if (opt$runFOVqc) {
 
-  # import probe classifier (to retrieve number of negative and study probes)
-  probes_class_file <- paste0(opt$run_dir, "/", opt$sample_id, "_probeClassifier.csv")
-  stopifnot("file not found" = file.exists(probes_class_file))
-  probe_class <- read.csv(probes_class_file, header = TRUE)
-  head(probe_class)
+  probes_file <- file.path(
+    opt$run_dir, paste0(opt$sample_id, "_probeQCmetrics.csv")
+  )
+  metadata_file <- file.path(
+    opt$run_dir, paste0(opt$sample_id, "_instanceMetadata.csv")
+  )
+  stopifnot(
+    "Probe QC metrics file not found" = file.exists(probes_file),
+    "Instance metadata file not found" = file.exists(metadata_file)
+  )
+  probe_class <- data.table::fread(probes_file)
+  df_meta <- data.table::fread(metadata_file)
 
-  # import metadata (to retrieve FOV)
-  metadata_file <- paste0(opt$run_dir, "/", opt$sample_id, "_cellMetadata.csv")
-  stopifnot("file not found" = file.exists(metadata_file))
-  df_meta <- read.csv(metadata_file, header = TRUE)
-  head(df_meta)
-  
-  if (!("FOV" %in% names(df_meta))) {
-    
-    # If no 'FOV' variable is present in the metadata
-    if ("fov" %in% names(df_meta)) {
-      # => first, check if it is a case-sensitivity issue
-      col_idx <- which(names(df_meta) == "fov")
-      names(df_meta)[col_idx] <- "FOV"
-    } else if ("instance_id" %in% names(df_meta)) {
-      # => next, check if 'instance_id' exists and follows the AtoMx pattern
-      #    and extract FOV from it
-      x <- df_meta$instance_id[1]
-      if( grepl("^c_[0-9]+_[0-9]+_[0-9]+$", x) ) {
-        df_meta$FOV <- tstrsplit(df_meta$instance_id, "_")[[3]]
-      } else { 
-        stop("cannot derive FOV-level QC metrics: 'FOV' variable not found in metadata")
-      }
-    } else {
-      stop("cannot derive FOV-level QC metrics: 'FOV' variable not found in metadata")
+  # Retrieve FOV identifiers
+  if ("FOV" %in% names(df_meta)) {
+    fov <- df_meta$FOV
+  } else if ("fov" %in% names(df_meta)) {
+    fov <- df_meta$fov
+  } else {
+    ids <- as.character(df_meta$instance_id)
+    if (!all(grepl("^c_[0-9]+_[0-9]+_[0-9]+$", ids))) {
+      stop("Cannot derive FOV from instance identifiers")
     }
-    
+    fov <- data.table::tstrsplit(ids, "_")[[3]]
   }
-  
-  df_meta <- df_meta |> dplyr::select(instance_id, FOV)
-  df0 <- plyr::join(df_meta, df0, by = "instance_id")
-  
-} 
+  df_meta$FOV <- fov
+  if (anyDuplicated(df_meta$instance_id) || anyNA(df_meta$FOV)) {
+    stop("Duplicate instance IDs or missing FOV assignments")
+  }
+
+  df0 <- dplyr::left_join(
+    df0,
+    df_meta |> dplyr::select(instance_id, FOV),
+    by = "instance_id"
+  )
+
+  if (anyNA(df0$FOV)) {
+    stop("Some instances could not be assigned to an FOV")
+  }
+}
 
 
 
@@ -98,59 +102,64 @@ if (opt$runFOVqc) {
 # --------- FOV-level derived variables ----------
 
 if (opt$runFOVqc) {
-  
   print("Calculating FOV-level QC metrics.")
-  # Aggregate cell-level metrics at the FOV level
-  df <- df0 |> dplyr::select(-instance_id, -sample_id)
-  df_match <- df0 |> dplyr::select(FOV, sample_id)
-
-  # focusing on a subset of quantitative variables that make sense to aggregate at the FOV level
-  # NOTE: could be interesting to have these FOV-level metrics for fluorescence data too...
-  df <- df |> dplyr::select(FOV, nCount_neg, nCount_sys,
-                            nCount_RNA, nFeature_RNA, complexity)
-  df$nCell <- 1
   
-  df_sum <- aggregate(. ~ FOV, df, sum)
-  df_sum <- df_sum[, -which(names(df_sum) %in% c("nFeature_RNA", "complexity"))]
-  names(df_sum) <- paste0(names(df_sum), "_FOVsum"); names(df_sum)[1] <- "FOV"
-  
-  df_avg <- aggregate(. ~ FOV, df, mean)
-  df_avg <- df_avg[, -which(names(df_avg) == "nCell")]
-  names(df_avg) <- paste0(names(df_avg), "_FOVavg"); names(df_avg)[1] <- "FOV"
-  
-  dfov <- plyr::join(df_sum, df_avg, by = "FOV")
-  head(dfov)
-  
+  dfov <- df0 |>
+    dplyr::group_by(sample_id, FOV) |>
+    dplyr::summarise(
+      nInstance_FOVsum = dplyr::n(),
+      nCount_neg_FOVsum = sum(nCount_neg),
+      nCount_sys_FOVsum = sum(nCount_sys),
+      nCount_RNA_FOVsum = sum(nCount_RNA),
+      nCount_neg_FOVavg = mean(nCount_neg),
+      nCount_sys_FOVavg = mean(nCount_sys),
+      nCount_RNA_FOVavg = mean(nCount_RNA),
+      nFeature_RNA_FOVavg = mean(nFeature_RNA),
+      complexity_FOVavg = mean(complexity, na.rm = TRUE),
+      .groups = "drop"
+    )
+  dfov$FOV <- as.character(dfov$FOV)
   
   # Calculate derived variables as described in AtoMx user manual
   n_neg <- probe_class |> dplyr::filter(negative == TRUE) |> nrow()
   n_probes <- probe_class |> dplyr::filter(!negative & !positive) |> nrow()
   
+  if (n_neg == 0 || n_probes == 0) {
+    stop("FOV SNR requires both negative and main probes to be present in the probe panel")
+  }
+
   # Signal to noise ratio
   # defined as the FOV total number of detected probes normalized to the number of distinct probes in the panel, 
   # divided by the FOV total number negative probes normalized to the number of distinc negative probes.
-  dfov$FOV_SNR <- (dfov$nCount_RNA_FOVsum / n_probes) / (dfov$nCount_neg_FOVsum / n_neg)
+  dfov$FOV_SNR <- ifelse(
+    dfov$nCount_neg_FOVsum > 0,
+    (dfov$nCount_RNA_FOVsum / n_probes) /
+      (dfov$nCount_neg_FOVsum / n_neg),
+    NA_real_
+  )
   
-  # If it exists, retrieve existing FOV file and append FOV QC metrics to it
-  fovQC_file <- paste0(opt$run_dir, "/", opt$sample_id, "_brukerQCresults.csv")
-  if(file.exists(fovQC_file)) {
-    dfov0 <- read.csv(fovQC_file, header = TRUE)
-    dfov0 <- dfov0 |>
-      dplyr::select(-any_of(c("gene", "failed_cycles"))) |>
-      dplyr::distinct() |>
-      dplyr::arrange(FOV)
-    dfov <- plyr::join(dfov, dfov0, by = "FOV") |>
-      dplyr::relocate(sample_id, .before = FOV)
-  } else {
-    dfov <- plyr::join(df_match, dfov, by = "FOV") |>
-      dplyr::relocate(sample_id, .before = FOV)
+# Append optional Bruker FOV QC results
+  bruker_file <- file.path(opt$run_dir, paste0(opt$sample_id, "_brukerQCresults.csv"))
+  if (file.exists(bruker_file)) {
+    bruker <- data.table::fread(bruker_file)
+    if (anyDuplicated(bruker$FOV)) {
+      stop("Duplicate FOV identifiers in Bruker QC results")
+    }
+    bruker$FOV <- as.character(bruker$FOV)
+    dfov <- dplyr::left_join(
+      dfov,
+      bruker |> dplyr::select(-sample_id),
+      by = "FOV"
+    )
   }
 
   # Save FOV-level QC metrics
   print("Saving FOV-level QC metrics:")
   print(head(dfov))
-  write.csv(dfov, row.names = FALSE, quote = FALSE, 
-            file = paste0(opt$run_dir, "/", opt$sample_id, "_fovQCmetrics.csv"))
+  data.table::fwrite(
+    dfov,
+    file.path(opt$run_dir, paste0(opt$sample_id, "_fovQCmetrics.csv"))
+  )
  
 }
 
@@ -160,29 +169,28 @@ if (opt$runFOVqc) {
 # ---------- Sample-level derived variables ----------
 
 print("Calculating sample-level QC metrics.")
-# Aggregate cell-level metrics at the FOV level
-df <- df0 |> dplyr::select(-instance_id, -any_of(c("FOV")))
-
-# focusing on quantitative variables that make sense to aggregate at the sample level
-df <- df |> dplyr::select(sample_id, nCount_neg, nCount_sys,
-                          nCount_RNA, nFeature_RNA, complexity)
-df$nCell <- 1
-
-df_sum <- aggregate(. ~ sample_id, df, sum)
-df_sum <- df_sum[, -which(names(df_sum) %in% c("complexity", "nFeature_RNA"))]
-names(df_sum) <- paste0(names(df_sum), "_sampleSum"); names(df_sum)[1] <- "sample_id"
-
-df_avg <- aggregate(. ~ sample_id, df, mean)
-df_avg <- df_avg[, -which(names(df_avg) == "nCell")]
-names(df_avg) <- paste0(names(df_avg), "_sampleAvg"); names(df_avg)[1] <- "sample_id"
-
-dfs <- plyr::join(df_sum, df_avg, by = "sample_id")
+dfs <- df0 |>
+  dplyr::group_by(sample_id) |>
+  dplyr::summarise(
+    nInstance_sampleSum = dplyr::n(),
+    nCount_neg_sampleSum = sum(nCount_neg),
+    nCount_sys_sampleSum = sum(nCount_sys),
+    nCount_RNA_sampleSum = sum(nCount_RNA),
+    nCount_neg_sampleAvg = mean(nCount_neg),
+    nCount_sys_sampleAvg = mean(nCount_sys),
+    nCount_RNA_sampleAvg = mean(nCount_RNA),
+    nFeature_RNA_sampleAvg = mean(nFeature_RNA),
+    complexity_sampleAvg = mean(complexity, na.rm = TRUE),
+    .groups = "drop"
+  )
 
 
 print("Saving sample-level QC metrics:")
 head(dfs)
-write.csv(dfs, row.names = FALSE, quote = FALSE, 
-          file = paste0(opt$run_dir, "/", opt$sample_id, "_sampleQCmetrics.csv"))
+data.table::fwrite(
+  dfs,
+  file.path(opt$run_dir, paste0(opt$sample_id, "_sampleQCmetrics.csv"))
+)
 
 
 

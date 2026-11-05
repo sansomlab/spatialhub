@@ -1,15 +1,15 @@
 ---
-title: "CosMx Cell QC"
+title: "CosMx Instance QC"
 author: Amélie Julé (Sansom Lab)
 date: "`r Sys.Date()`"
 params:
   group: NULL
-  cell_nCount_cutoff: NULL
-  cell_nFeature_cutoff: NULL
-  cell_percentNeg_cutoff: NULL
-  cell_complexity_cutoff: NULL
-  exclCellsInFailedFOVs: NULL
-  sampleMinCells: NULL
+  instance_nCount_cutoff: NULL
+  instance_nFeature_cutoff: NULL
+  instance_percentNeg_cutoff: NULL
+  instance_complexity_cutoff: NULL
+  exclInstancesInFailedFOVs: NULL
+  sampleMinInstances: NULL
   sampleMinPercent: NULL
   composite_ncol: 2
   composite_spacing: 500
@@ -35,7 +35,7 @@ output:
 knitr::opts_chunk$set(message = FALSE, warning = FALSE, error = TRUE,
                       prompt = FALSE, cache = FALSE, tidy = FALSE)
 set.seed(123456789)
-report <- "cellQC"
+report <- "instanceQC"
 ```
 
 ```{r libraries}
@@ -87,13 +87,13 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
 ```
 
 
-Before QC, each sample totals the following number of cells:
+Before QC, each sample totals the following number of instances:
 
 ```{r}
-qc_sample <- spx_meta[, c("sample_id", "nCell_sampleSum")]
+qc_sample <- spx_meta[, c("sample_id", "nInstance_sampleSum")]
 qc_sample <- qc_sample[!duplicated(qc_sample), ]
 rownames(qc_sample) <- 1:nrow(qc_sample)
-qc_sample |> dplyr::arrange(desc(nCell_sampleSum))
+qc_sample |> dplyr::arrange(desc(nInstance_sampleSum))
 ```
 
 * * *
@@ -101,19 +101,19 @@ qc_sample |> dplyr::arrange(desc(nCell_sampleSum))
 * * *
 
 
-# Cell QC
+# Instance QC
 
-"*Cell QC flags cells with low or spurious signal based on the number of targets detected (more is better), fraction of probes which are negative controls (fewer is better), uniformity of count distribution (higher complexity is preferred), and cell size (the top percentile may need to be removed as a QC of segmentation).*" (from AtoMx user manual) 
+"*Instance QC flags instances with low or spurious signal based on the number of targets detected (more is better), fraction of probes which are negative controls (fewer is better), uniformity of count distribution (higher complexity is preferred), and instance size (the top percentile may need to be removed as a QC of segmentation).*" (from AtoMx user manual) 
 
-**NOTE: `spatialhub` leaves the cell size QC parameter aside -- this is considered as a segmentation QC.**
+**NOTE: `spatialhub` leaves the instance size QC parameter aside -- this is considered as a segmentation QC.**
 
 
 ## Visual assessment of variation in space
 
-The following plots highlight the areas with higher `nCount_RNA` per cell, which tends to be sample/morphology specific. **Color scales are capped for contrast, readability and comparability across slides (where applicable).**
+The following plots highlight the areas with higher `nCount_RNA` per instance, which tends to be sample/morphology specific. **Color scales are capped for contrast, readability and comparability across slides (where applicable).**
 
 
-### Total counts per cell (all probes)
+### Total counts per instance (all probes)
 
 ```{r, fig.height=12L}
 col_max <- signif(max(spx_meta$nCount_RNA) * 2/3, 2)
@@ -137,7 +137,7 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
 ```
 
 
-### Total counts and distinct probes per cell: per-sample Zoom {.tabset}
+### Total counts and distinct probes per instance: per-sample Zoom {.tabset}
 
 ```{r}
 gg_ls <- list() 
@@ -146,7 +146,7 @@ for (sample in unique(spx_meta$sample_id)) {
   
   spx_sample <- spx_meta |>
     dplyr::filter(sample_id == sample)
-  nCells_sample <- unique(spx_sample$nCell_sampleSum)
+  nInstances_sample <- unique(spx_sample$nInstance_sampleSum)
   
   col_max <- signif(max(spx_sample$nCount_RNA) * 2/3, 2)
   g1 <- spx_sample |>  
@@ -155,7 +155,7 @@ for (sample in unique(spx_meta$sample_id)) {
     geom_point(size = 0.1) + theme_classic(base_size = font_size) +
     scale_color_gradient(low = "grey75", high = "blue",
                          limits = c(0, col_max), oob = scales::squish) +
-    ggtitle(paste0("Cell count (pre-QC): ", nCells_sample)) + 
+    ggtitle(paste0("Instance count (pre-QC): ", nInstances_sample)) + 
     theme(plot.title = element_text(hjust = 0.5)) +
     coord_fixed()
   
@@ -190,7 +190,7 @@ for(i in 1:length(gg_ls)) {
 
 
 
-## Distribution of total transcripts per cell {.tabset}
+## Distribution of total transcripts per instance {.tabset}
 
 Centrality metrics for `nCount_RNA` (before QC) across different groups:
 
@@ -205,20 +205,20 @@ spx_meta |>
 
 ***
 
-**Number of Pass/Fail per sample at user-defined threshold for `nCount_RNA` per cell:**
+**Number of Pass/Fail per sample at user-defined threshold for `nCount_RNA` per instance:**
 
 ```{r}
-nCount_RNA_min <- min(spx_meta$nCount_RNA[spx_meta$qcFlagCell_summary == "Pass"])
-print(paste0("Lowest `nCount_RNA` per cell in cells that passed QC: ", 
+nCount_RNA_min <- min(spx_meta$nCount_RNA[spx_meta$qcFlagInstance_summary == "Pass"])
+print(paste0("Lowest `nCount_RNA` per instance in instances that passed QC: ", 
              round(nCount_RNA_min, 3)))
 
 # Reminder: by default, the cutoff is set to 20 (unless otherwise specified in the YAML file), as recommended by Bruker for the 1000-plex panel
-c20 <- table(spx_meta$sample_id, spx_meta$qcFlagCell_nCount)
+c20 <- table(spx_meta$sample_id, spx_meta$qcFlagInstance_nCount)
 c20percent <- round(prop.table(c20, margin = 1) * 100, 1)
 
 df <- cbind(c20, c20percent)
-colnames(df) <- c("Total failed cells", "Total passed cells",
-                  "Percent failed cells", "Percent passed cells")
+colnames(df) <- c("Total failed instances", "Total passed instances",
+                  "Percent failed instances", "Percent passed instances")
 df |> as.data.frame()
 ```
 
@@ -227,8 +227,8 @@ df |> as.data.frame()
 In summary, per condition of interest:
 
 ```{r}
-all_groups <- round(table(spx_meta$qcFlagCell_nCount) / nrow(spx_meta) * 100, 1)
-t <- table(spx_meta$group, spx_meta$qcFlagCell_nCount)
+all_groups <- round(table(spx_meta$qcFlagInstance_nCount) / nrow(spx_meta) * 100, 1)
+t <- table(spx_meta$group, spx_meta$qcFlagInstance_nCount)
 t <- round(t / rep(table(spx_meta$group), 2) * 100, 1)
 df <- rbind(all_groups, t); df
 ```
@@ -313,7 +313,7 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
 
 ***
 
-### `cell_key` rank
+### `instance_key` rank
 
 ```{r, out.width="80%"}
 spx_meta_ls <- split(spx_meta, f = spx_meta$slide_id)
@@ -335,13 +335,13 @@ spx_meta |>
   theme_minimal() +
   scale_color_manual(values = 
                        colsD) +
-  ggtitle("Cells ranked by total transcripts (nCount_RNA)")
+  ggtitle("Instances ranked by total transcripts (nCount_RNA)")
 ```
 
 ***
 
 
-## Distribution of total distinct probes per cell {.tabset}
+## Distribution of total distinct probes per instance {.tabset}
 
 Centrality metrics for `nFeature_RNA` (before QC) across different groups:
 
@@ -356,20 +356,20 @@ spx_meta |>
 
 ***
 
-**Number of Pass/Fail per sample at user-defined threshold for `nFeature_RNA` per cell:**
+**Number of Pass/Fail per sample at user-defined threshold for `nFeature_RNA` per instance:**
 
 ```{r}
-nFeature_RNA_min <- min(spx_meta$nFeature_RNA[spx_meta$qcFlagCell_summary == "Pass"])
-print(paste0("Lowest `nFeature_RNA` per cell in cells that passed QC: ", 
+nFeature_RNA_min <- min(spx_meta$nFeature_RNA[spx_meta$qcFlagInstance_summary == "Pass"])
+print(paste0("Lowest `nFeature_RNA` per instance in instances that passed QC: ", 
              round(nFeature_RNA_min, 3)))
 
 # Reminder: by default, the cutoff is set to 5 (unless otherwise specified in the YAML file), as recommended by Bruker for the 1000-plex panel
-c20 <- table(spx_meta$sample_id, spx_meta$qcFlagCell_nFeature)
+c20 <- table(spx_meta$sample_id, spx_meta$qcFlagInstance_nFeature)
 c20percent <- round(prop.table(c20, margin = 1) * 100, 1)
 
 df <- cbind(c20, c20percent)
-colnames(df) <- c("Total failed cells", "Total passed cells",
-                  "Percent failed cells", "Percent passed cells")
+colnames(df) <- c("Total failed instances", "Total passed instances",
+                  "Percent failed instances", "Percent passed instances")
 df |> as.data.frame()
 ```
 
@@ -378,8 +378,8 @@ df |> as.data.frame()
 In summary, per condition of interest:
 
 ```{r}
-all_groups <- round(table(spx_meta$qcFlagCell_nFeature) / nrow(spx_meta) * 100, 1)
-t <- table(spx_meta$group, spx_meta$qcFlagCell_nFeature)
+all_groups <- round(table(spx_meta$qcFlagInstance_nFeature) / nrow(spx_meta) * 100, 1)
+t <- table(spx_meta$group, spx_meta$qcFlagInstance_nFeature)
 t <- round(t / rep(table(spx_meta$group), 2) * 100, 1)
 df <- rbind(all_groups, t); df
 ```
@@ -475,8 +475,8 @@ spx_meta |>
   scale_x_log10() + 
   scale_y_log10() + 
   theme_classic() +
-  geom_vline(xintercept = params$cell_nCount_cutoff, col = "red") + 
-  geom_hline(yintercept = params$cell_nFeature_cutoff, col = "red") + 
+  geom_vline(xintercept = params$instance_nCount_cutoff, col = "red") + 
+  geom_hline(yintercept = params$instance_nFeature_cutoff, col = "red") + 
   ggtitle("Probes vs. Transcripts") +
   facet_wrap(~slide_id) +
   xlab("nCount_RNA (log10 scale)")
@@ -500,8 +500,8 @@ spx_meta |>
 ***
 
 ```{r}
-percentNegCounts_max <- max(spx_meta$percentNegCounts[spx_meta$qcFlagCell_summary == "Pass"])
-print(paste0("Highest `percentNegCounts` per cell in cells that passed QC: ", 
+percentNegCounts_max <- max(spx_meta$percentNegCounts[spx_meta$qcFlagInstance_summary == "Pass"])
+print(paste0("Highest `percentNegCounts` per instance in instances that passed QC: ", 
              round(percentNegCounts_max, 3)))
 ```
 
@@ -510,8 +510,8 @@ print(paste0("Highest `percentNegCounts` per cell in cells that passed QC: ",
 Pass/Fail summary, per condition of interest:
 
 ```{r}
-all_groups <- round(table(spx_meta$qcFlagCell_percentNeg) / nrow(spx_meta) * 100, 1)
-t <- table(spx_meta$group, spx_meta$qcFlagCell_percentNeg)
+all_groups <- round(table(spx_meta$qcFlagInstance_percentNeg) / nrow(spx_meta) * 100, 1)
+t <- table(spx_meta$group, spx_meta$qcFlagInstance_percentNeg)
 t <- round(t / rep(table(spx_meta$group), 2) * 100, 1)
 df <- rbind(all_groups, t); df
 ```
@@ -529,7 +529,7 @@ for (slide in sort(unique(spx_meta$slide_id))) {
     ggplot(aes(x = percentNegCounts, y = sample_id, fill = group)) +
     geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
     #geom_jitter(width = 0, height = 0.1, size = 0.2) +
-    xlab("Percentage of negative counts per cell") + 
+    xlab("Percentage of negative counts per instance") + 
     geom_vline(xintercept = floor(percentNegCounts_max), lty = 2) +
     theme_classic(base_size = font_size) +
     ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
@@ -555,7 +555,7 @@ for (slide in sort(unique(spx_meta$slide_id))) {
     ggplot(aes(x = percentNegCounts, y = group, fill = group)) +
     geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
     #geom_jitter(width = 0, height = 0.1, size = 0.2) +
-    xlab("Percentage of negative counts per cell") + 
+    xlab("Percentage of negative counts per instance") + 
     geom_vline(xintercept = floor(percentNegCounts_max), lty = 2) +
     theme_classic(base_size = font_size) +
     ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
@@ -581,7 +581,7 @@ for (slide in sort(unique(spx_meta$slide_id))) {
     ggplot(aes(x = percentNegCounts, y = group, fill = group)) +
     geom_violin() + geom_boxplot(fill = "white", width = 0.15) + 
     #geom_jitter(width = 0, height = 0.1, size = 0.2) +
-    xlab("Percentage of negative counts per cell") + 
+    xlab("Percentage of negative counts per instance") + 
     geom_vline(xintercept = floor(percentNegCounts_max), lty = 2) +
     theme_classic(base_size = font_size) +
     scale_x_log10() +
@@ -597,9 +597,9 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
 ***
 
 
-## Cell complexity {.tabset}
+## Instance complexity {.tabset}
 
-The total counts (transcripts) must exceed the number of detected probes (genes) in the cell, i.e. `nCount_RNA` / `nFeature_RNA` > 1
+The total counts (transcripts) must exceed the number of detected probes (genes) in the instance, i.e. `nCount_RNA` / `nFeature_RNA` > 1
 
 ***
 
@@ -617,9 +617,9 @@ spx_meta |>
 ***
 
 ```{r}
-#spx_meta[is.na(spx_meta$complexity), ]  # one cell with only neg probes
-complexity_min <- min(spx_meta$complexity[spx_meta$qcFlagCell_summary == "Pass"], na.rm = TRUE)
-print(paste0("Lowest `complexity` per cell in cells that passed QC: ", 
+#spx_meta[is.na(spx_meta$complexity), ]  # one instance with only neg probes
+complexity_min <- min(spx_meta$complexity[spx_meta$qcFlagInstance_summary == "Pass"], na.rm = TRUE)
+print(paste0("Lowest `complexity` per instance in instances that passed QC: ", 
              round(complexity_min, 3)))
 ```
 
@@ -628,8 +628,8 @@ print(paste0("Lowest `complexity` per cell in cells that passed QC: ",
 Pass/Fail summary, per condition of interest:
 
 ```{r}
-all_groups <- round(table(spx_meta$qcFlagCell_complex) / nrow(spx_meta) * 100, 1)
-t <- table(spx_meta$group, spx_meta$qcFlagCell_complex)
+all_groups <- round(table(spx_meta$qcFlagInstance_complex) / nrow(spx_meta) * 100, 1)
+t <- table(spx_meta$group, spx_meta$qcFlagInstance_complex)
 t <- round(t / rep(table(spx_meta$group), 2) * 100, 1)
 
 df <- rbind(all_groups, t)
@@ -723,37 +723,37 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
 ***
 
 
-# Conclusion on cell QC
+# Conclusion on instance QC
 
-In summary, `spatialhub` flags a cell as passing QC if it fulfills all of the following criteria:
+In summary, `spatialhub` flags a instance as passing QC if it fulfills all of the following criteria:
 
-- `nCount_RNA` >= `r params$cell_nCount_cutoff`;
-- `nFeature_RNA` >= `r params$cell_nFeature_cutoff`;
-- `percentNegCounts` < `r params$cell_percentNeg_cutoff`%;
-- `complexity` > `r params$cell_complexity_cutoff`;
+- `nCount_RNA` >= `r params$instance_nCount_cutoff`;
+- `nFeature_RNA` >= `r params$instance_nFeature_cutoff`;
+- `percentNegCounts` < `r params$instance_percentNeg_cutoff`%;
+- `complexity` > `r params$instance_complexity_cutoff`;
 
-Following cell (and if applicable, FOV) QC, **`spatialhub` flags a _sample_ as passing QC if it fulfills both of the following criteria**:
+Following instance (and if applicable, FOV) QC, **`spatialhub` flags a _sample_ as passing QC if it fulfills both of the following criteria**:
 
-- The number of cells left for that sample after excluding low-quality cells (and if `exclCellsInFailedFOVs` is set to `true`, after excluding low-quality FOVs as well) is >=`r params$sampleMinCells`;
-- The percentage of cells left for that sample after excluding low-quality cells (and if `exclCellsInFailedFOVs` is set to `true`, after excluding low-quality FOVs as well) is >`r params$sampleMinPercent`.
+- The number of instances left for that sample after excluding low-quality instances (and if `exclInstancesInFailedFOVs` is set to `true`, after excluding low-quality FOVs as well) is >=`r params$sampleMinInstances`;
+- The percentage of instances left for that sample after excluding low-quality instances (and if `exclInstancesInFailedFOVs` is set to `true`, after excluding low-quality FOVs as well) is >`r params$sampleMinPercent`.
 
-In this version of the QC, `exclCellsInFailedFOVs` = `r params$exclCellsInFailedFOVs`.
+In this version of the QC, `exclInstancesInFailedFOVs` = `r params$exclInstancesInFailedFOVs`.
 
 
 ## Spatial plot flagging Pass/Fail {.tabset}
 
-### low-quality cells highlighted
+### low-quality instances highlighted
 
 ```{r, fig.height=12L}
-spx_meta$qcFlagCell_summary <- factor(as.character(spx_meta$qcFlagCell_summary), levels = c("Pass", "Fail"))
+spx_meta$qcFlagInstance_summary <- factor(as.character(spx_meta$qcFlagInstance_summary), levels = c("Pass", "Fail"))
 
 gg_slide <- list()
 for (slide in sort(unique(spx_meta$slide_id))) {
 
   g <- spx_meta |>
     dplyr::filter(slide_id == slide) |>  
-    dplyr::arrange(qcFlagCell_summary) |> 
-    ggplot(aes(x = CenterX_composite, y = CenterY_composite, color = qcFlagCell_summary)) +
+    dplyr::arrange(qcFlagInstance_summary) |> 
+    ggplot(aes(x = CenterX_composite, y = CenterY_composite, color = qcFlagInstance_summary)) +
     geom_point(size = 0.1) + theme_classic(base_size = font_size) +
     scale_color_manual(values = alpha(c("grey70", "red2"), 0.5)) +
     ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
@@ -792,7 +792,7 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
 
 ***
 
-### low-quality cells and samples removed
+### low-quality instances and samples removed
 
 ```{r, fig.height=12L}
 gg_slide <- list()
@@ -800,9 +800,9 @@ for (slide in sort(unique(spx_meta$slide_id))) {
 
   g <- spx_meta |>
     dplyr::filter(slide_id == slide) |>  
-    dplyr::filter(qcFlagCell_summary == "Pass") |> 
+    dplyr::filter(qcFlagInstance_summary == "Pass") |> 
     dplyr::filter(qcFlagSample_summary == "Pass") |> 
-    ggplot(aes(x = CenterX_composite, y = CenterY_composite, color = qcFlagCell_summary)) +
+    ggplot(aes(x = CenterX_composite, y = CenterY_composite, color = qcFlagInstance_summary)) +
     geom_point(size = 0.02) + theme_classic(base_size = 14) +
     scale_color_manual(values = alpha(c("grey60"), 0.8)) +
     coord_fixed() + theme(legend.position = 'none')
@@ -823,8 +823,8 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
 ```{r}
 qc_vars <- names(spx_meta)
 qc_vars <- c("sample_id", "group",
-             "nCell_sampleSum", "nCell_sampleSum_passQC", "samplePercentCellsPassQC",
-             "samplePercentCellsInFailedFOV", "qcFlagSample_summary",
+             "nInstance_sampleSum", "nInstance_sampleSum_passQC", "samplePercentInstancesPassQC",
+             "samplePercentInstancesInFailedFOV", "qcFlagSample_summary",
              qc_vars[grep("sampleSum", qc_vars)], qc_vars[grep("sampleAvg", qc_vars)])
 qc_vars <- unique(qc_vars[qc_vars %in% names(spx_meta)])
 
@@ -834,7 +834,7 @@ rownames(qc_sample) <- 1:nrow(qc_sample)
 
 qc_sample |>
   dplyr::select(all_of(qc_vars)) |>
-  dplyr::arrange(desc(nCell_sampleSum_passQC))
+  dplyr::arrange(desc(nInstance_sampleSum_passQC))
 ```
 
 ***
@@ -842,8 +842,8 @@ qc_sample |>
 Or, in summary:
 
 ```{r}
-print("Percentage of cells passing QC:")
-spx_meta$qcFlagOverall_summary <- ifelse(spx_meta$qcFlagCell_summary == "Pass" & spx_meta$qcFlagSample_summary == "Pass", "Pass", "Fail")
+print("Percentage of instances passing QC:")
+spx_meta$qcFlagOverall_summary <- ifelse(spx_meta$qcFlagInstance_summary == "Pass" & spx_meta$qcFlagSample_summary == "Pass", "Pass", "Fail")
 
 all_groups <- round(table(spx_meta$qcFlagOverall_summary) / nrow(spx_meta) * 100, 1)
 t <- table(spx_meta$group, spx_meta$qcFlagOverall_summary); t <- round(t / rep(table(spx_meta$group), 2) * 100, 1)
@@ -854,7 +854,7 @@ df <- rbind(all_groups, t); df
 ***
 
 ```{r}
-print("Number of cells passing QC:")
+print("Number of instances passing QC:")
 all_groups <- table(spx_meta$qcFlagOverall_summary)
 t <- table(spx_meta$group, spx_meta$qcFlagOverall_summary)
 
@@ -863,7 +863,7 @@ df <- rbind(all_groups, t); df
 
 ***
 
-After excluding low-quality cells, the distribution of number of transcripts (`nCount_RNA`) and distinct probes (`nFeature_RNA`) detected per cell looks like this:
+After excluding low-quality instances, the distribution of number of transcripts (`nCount_RNA`) and distinct probes (`nFeature_RNA`) detected per instance looks like this:
 
 ```{r}
 filtered_meta <- spx_meta |> dplyr::filter(qcFlagOverall_summary == "Pass") 
@@ -883,10 +883,10 @@ filtered_meta |>
   geom_density(alpha = 0.2) + 
   scale_x_log10() + 
   theme_classic() +
-  ylab("Cell density") +
+  ylab("Instance density") +
   geom_vline(xintercept = median(filtered_meta$nCount_RNA), lty = 1) +
   geom_vline(xintercept = mean(filtered_meta$nCount_RNA), lty = 2) +
-  ggtitle(paste0("Total transcripts per cell")) +
+  ggtitle(paste0("Total transcripts per instance")) +
   facet_wrap(. ~ group) +
   NULL
 ```
@@ -904,10 +904,10 @@ filtered_meta |>
   geom_density(alpha = 0.2) + 
   scale_x_log10() + 
   theme_classic() +
-  ylab("Cell density") +
+  ylab("Instance density") +
   geom_vline(xintercept = median(filtered_meta$nFeature_RNA), lty = 1) +
   geom_vline(xintercept = mean(filtered_meta$nFeature_RNA), lty = 2) +
-  ggtitle(paste0("Total distinct probes per cell")) +
+  ggtitle(paste0("Total distinct probes per instance")) +
   facet_wrap(. ~ group) +
   NULL
 ```
@@ -918,7 +918,7 @@ filtered_meta |>
 
 
 
-## Total counts and distinct probes per cell (post-QC): per-sample Zoom {.tabset}
+## Total counts and distinct probes per instance (post-QC): per-sample Zoom {.tabset}
 
 ```{r}
 gg_ls <- list() 
@@ -927,7 +927,7 @@ for (sample in unique(filtered_meta$sample_id)) {
   
   spx_sample <- filtered_meta |>
     dplyr::filter(sample_id == sample)
-  nCells_sample <- unique(spx_sample$nCell_sampleSum_passQC)
+  nInstances_sample <- unique(spx_sample$nInstance_sampleSum_passQC)
   
   col_max <- signif(max(spx_sample$nCount_RNA) * 2/3, 2)
   g1 <- spx_sample |>  
@@ -936,7 +936,7 @@ for (sample in unique(filtered_meta$sample_id)) {
     geom_point(size = 0.1) + theme_classic(base_size = font_size) +
     scale_color_gradient(low = "grey75", high = "blue",
                          limits = c(0, col_max), oob = scales::squish) +
-    ggtitle(paste0("Cell count (post-QC): ", nCells_sample)) + 
+    ggtitle(paste0("Instance count (post-QC): ", nInstances_sample)) + 
     theme(plot.title = element_text(hjust = 0.5)) +
     coord_fixed()
   

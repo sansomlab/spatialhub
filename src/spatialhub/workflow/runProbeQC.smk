@@ -10,13 +10,13 @@ Some QC metrics may be technology-specific - e.g. FOV level QC metrics for CosMx
 
 Inputs
 ------
-- cell x gene transcripts count table derived from a given segmentation mask
+- instance x gene transcripts count table derived from a given segmentation mask
 
 
 Outputs
 -------
 - CSV tables of QC metrics and flags per sample
-- Enriched cell-level metadata table for the project, including QC metrics and sample-level metadata relevant for the study
+- Enriched instance-level metadata table for the project, including QC metrics and sample-level metadata relevant for the study
 - HTML QC reports and underlying Rmd files for the user to further amend manually
 """
 
@@ -65,7 +65,7 @@ PROBEQC_FLAG_SCRIPT = files("spatialhub").joinpath(
 # Pointers to Rmd files distributed within the spatialhub package
 PROBEQC_REPORT_RMD = files("spatialhub").joinpath(
     "reports",
-    "probeqc_cell_report.Rmd",
+    "probeqc_instance_report.Rmd",
 )
 PROBEQC_REPORT_FOV_RMD = files("spatialhub").joinpath(
     "reports",
@@ -109,233 +109,100 @@ with QC_THRESHOLDS.open() as f:
     qc_thresholds = yaml.safe_load(f)
 
 
-
-
 # ----------------------------------------------------------------------
 # Discover input files
 # ----------------------------------------------------------------------
 
 H5AD_DIR = Path(config["h5ad_dir"])
-
-if not H5AD_DIR.exists():
-    raise FileNotFoundError(
-        f"Input h5ad_dir does not exist: {H5AD_DIR}"
-    )
 if not H5AD_DIR.is_dir():
     raise NotADirectoryError(
-        f"Expected h5ad_dir to be a directory: {H5AD_DIR}"
+        f"Invalid H5AD directory: {H5AD_DIR}"
     )
 
 H5AD_FILES = sorted(H5AD_DIR.glob("*.h5ad"))
-RDS_FILES = sorted(H5AD_DIR.glob("*.rds"))
-if H5AD_FILES and RDS_FILES:
-    raise ValueError(
-        "h5ad_dir contains both .h5ad and .rds files. "
-        "Please use a directory containing only one input format."
-    )
-
-if H5AD_FILES:
-    INPUT_FILES = H5AD_FILES
-    INPUT_FORMAT = "h5ad"
-elif RDS_FILES:
-    INPUT_FILES = RDS_FILES
-    INPUT_FORMAT = "rds"
-else:
-    raise FileNotFoundError(
-        f"No .h5ad or .rds files found in {H5AD_DIR}"
-    )
+if not H5AD_FILES:
+    raise ValueError(f"No H5AD files found in {H5AD_DIR}")
 
 # Each filename stem defines the sample name used by Snakemake.
-SAMPLES = [path.stem for path in INPUT_FILES]
-
-if len(SAMPLES) != len(set(SAMPLES)):
-    raise ValueError(
-        "Duplicate sample names found after removing file extensions."
-    )
-
-INPUT_BY_SAMPLE = {
-    path.stem: str(path)
-    for path in INPUT_FILES
-}
+SAMPLES = [path.stem for path in H5AD_FILES]
 
 
 # ----------------------------------------------------------------------
 # Validate inputs and resolve output directory name
 # ----------------------------------------------------------------------
 
-# Initiate global output directory names - with default if not specified
-PROBEQC_DIR = Path(config.get("probeqc_dir", "probeqc.dir"))
-RUN_NAME_OVERRIDE = config.get("run_name")
-QC_PROFILE = config.get("qc_outdir", "current")
-
-
-def format_points_from(value):
-    """Return points_from as a stable tuple of strings."""
-
-    if isinstance(value, str):
-        return (value,)
-
-    return tuple(str(x) for x in value)
-
-
-def read_counts_mtx_config(path):
-    """
-    Read the aggregation configuration (i.e. source Points elements, segmentation mask, etc.)
-    from an H5AD AnnData table generated with `spatialhub`.
-    """
-
+def read_provenance(path):
+    """Read spatialhub provenance without loading the count matrix."""
+    
     adata = ad.read_h5ad(path, backed="r")
+    source = adata.uns.get("counts_mtx_source")
+    adata.file.close()
+    
+    if source is not None:
+        source = {
+            k: v.tolist() if hasattr(v, "tolist") else v
+            for k, v in source.items()
+        }
+    
+    return source
 
-    try:
-        if "counts_mtx_source" not in adata.uns:
-            return None
+sources = [read_provenance(path) for path in H5AD_FILES]
 
-        source = adata.uns["counts_mtx_source"]
+if any(s is not None for s in sources) and not all(s is not None for s in sources):
+    raise ValueError("Cannot mix spatialhub and external H5AD inputs")
 
-        required = [
-            "points_from",
-            "shapes_by",
-            "agg_func",
-            "coords_system",
-        ]
+SPATIALHUB = all(s is not None for s in sources)
 
-        missing = [
-            key
-            for key in required
-            if key not in source
-        ]
-
-        if missing:
-            raise ValueError(
-                f"{path} has incomplete "
-                "adata.uns['counts_mtx_source'] metadata. "
-                f"Missing: {missing}"
-            )
-
+if SPATIALHUB:
+    # Sample-specific provenance is expected to differ. Other fields must match.
+    def signature(source):
         return {
-            "points_from": format_points_from(
-                source["points_from"]
-            ),
-            "shapes_by": str(source["shapes_by"]),
-            "agg_func": str(source["agg_func"]),
-            "coords_system": str(source["coords_system"]),
+            k: v for k, v in source.items()
+            if k not in ("sample_id", "input_zarr")
         }
 
-    finally:
-        adata.file.close()
+    PROVENANCE = signature(sources[0])
+    for path, source in zip(H5AD_FILES[1:], sources[1:]):
+        if signature(source) != PROVENANCE:
+            raise ValueError(f"Incompatible count-matrix provenance: {path}")
+
+    region_type = PROVENANCE.get("region_type")
+    if region_type == "segment":
+        region_name = PROVENANCE["shapes_by"]
+    elif region_type == "grid":
+        region_name = f"{PROVENANCE['bin_size']}{PROVENANCE['bin_unit']}"
+    else:
+        raise ValueError(f"Unknown region_type: {region_type}")
+
+    DEFAULT_RUN_NAME = f"{region_type}_{region_name}"
+else:
+    DEFAULT_RUN_NAME = None
 
 
-def validate_h5ad_provenance(h5ad_files):
-    """
-    Validate counts_mtx_source metadata across all H5AD inputs.
+# Set run name and output directories accordingly
+RUN_NAME = config.get("run_name", DEFAULT_RUN_NAME)
 
-    Returns the shared count-matrix configuration if provenance is
-    available, otherwise None.
-
-    If some files contain provenance and others do not, fail.
-    """
-
-    signatures = [
-        read_counts_mtx_config(path)
-        for path in h5ad_files
-    ]
-
-    have_provenance = [
-        signature is not None
-        for signature in signatures
-    ]
-
-    # Mixed H5AD sources
-    if any(have_provenance) and not all(have_provenance):
-        missing = [
-            str(path)
-            for path, signature in zip(h5ad_files, signatures)
-            if signature is None
-        ]
-
-        raise ValueError(
-            "Some H5ADs contain adata.uns['counts_mtx_source'] "
-            "metadata and others do not.\n"
-            "Missing provenance:\n"
-            + "\n".join(missing)
-        )
-
-    # External H5AD collection (not generated using `spatialhub`)
-    if not any(have_provenance):
-        return None
-
-    reference = signatures[0]
-
-    for path, signature in zip(h5ad_files[1:], signatures[1:]):
-        if signature != reference:
-            raise ValueError(
-                "Input H5ADs do not share the same "
-                "count-matrix configuration.\n"
-                f"Reference: {reference}\n"
-                f"{path}: {signature}"
-            )
-
-    return reference
-
-
-def set_run_name(mtx_provenance):
-    """Construct the default ProbeQC run name from H5AD provenance."""
-
-    points_label = "+".join(mtx_provenance["points_from"])
-
-    return ".".join(
-        [
-            points_label,
-            mtx_provenance["shapes_by"],
-            mtx_provenance["agg_func"],
-            mtx_provenance["coords_system"],
-        ]
+if not RUN_NAME:
+    raise ValueError(
+        "H5AD inputs generated outside of spatialhub require an explicit run_name"
     )
 
-
-# Apply functions to validate input and set outdir run name
-if INPUT_FORMAT == "h5ad":
-
-    PROVENANCE = validate_h5ad_provenance(H5AD_FILES)
-
-    if RUN_NAME_OVERRIDE:
-        # `run_name` affects only the output *directory* name
-        RUN_NAME = str(RUN_NAME_OVERRIDE)
-
-    elif PROVENANCE is not None:
-        RUN_NAME = set_run_name(PROVENANCE)
-
-    else:
-        raise ValueError(
-            "Input H5ADs do not contain "
-            "adata.uns['counts_mtx_source'] metadata. "
-            "Specify 'run_name' in runProbeQC.yaml."
-        )
-
-else:
-    # RDS files do not provide the AnnData provenance mechanism,
-    # so the run directory must be named explicitly.
-    if not RUN_NAME_OVERRIDE:
-        raise ValueError(
-            "run_name must be specified in runProbeQC.yaml "
-            "when using RDS input."
-        )
-
-    RUN_NAME = str(RUN_NAME_OVERRIDE)
-
-
-# Define sub-directory names based on input
-RUN_DIR = PROBEQC_DIR / RUN_NAME
-RES_DIR = RUN_DIR / "results" 
-QC_DIR = RUN_DIR / "filtering" / QC_PROFILE
+RUN_DIR = Path(config["outdir"]) / RUN_NAME
+RES_DIR = RUN_DIR / "results"
+QC_DIR = RUN_DIR / "filtering" / "current"
 REPORT_DIR = QC_DIR / "reports"
 
 print(f"ProbeQC input directory: {H5AD_DIR}")
-print(f"Input format: {INPUT_FORMAT}")
+print(f"Input source: {'spatialhub' if SPATIALHUB else 'external'}")
 print(f"Samples found: {len(SAMPLES)}")
-print(f"ProbeQC run name: {RUN_NAME}")
-print(f"ProbeQC metrics calculation directory: {RES_DIR}")
-print(f"ProbeQC thresholding results directory: {QC_DIR}")
+print(f"ProbeQC output directory: {RUN_DIR}")
+
+
+if RUN_BRUKER_QC and SPATIALHUB and region_type == "grid":
+    raise ValueError(
+        "Bruker FOV QC is not supported for grid-based count matrices. "
+        "Set run_bruker_qc: false."
+    )
 
 
 # ----------------------------------------------------------------------
@@ -345,15 +212,15 @@ print(f"ProbeQC thresholding results directory: {QC_DIR}")
 MTXQC_OUTPUTS = [
     os.path.join(
         str(RES_DIR),
-        "{sample}_cellQCmetrics.csv",
+        "{sample}_instanceQCmetrics.csv",
     ),
     os.path.join(
         str(RES_DIR),
-        "{sample}_cellMetadata.csv",
+        "{sample}_instanceMetadata.csv",
     ),
     os.path.join(
         str(RES_DIR),
-        "{sample}_probeClassifier.csv",
+        "{sample}_probeQCmetrics.csv",
     ),
 ]
 
@@ -387,7 +254,7 @@ if RUN_FOV_QC:
 
 
 FLAG_OUTPUTS = [
-    os.path.join(str(QC_DIR), f"{RUN_NAME}_cellQCmetrics.csv"),
+    os.path.join(str(QC_DIR), f"{RUN_NAME}_instanceQCmetrics.csv"),
     os.path.join(str(QC_DIR), f"{RUN_NAME}_sampleQCmetrics.csv")
 ]
 
@@ -397,7 +264,7 @@ if RUN_FOV_QC:
     )
 
 REPORT_OUTPUTS = [
-    os.path.join(str(REPORT_DIR), f"probeqc_{RUN_NAME}_cell.html"),
+    os.path.join(str(REPORT_DIR), f"probeqc_{RUN_NAME}_instance.html"),
 ]
 
 if RUN_FOV_QC:
@@ -420,11 +287,11 @@ rule full:
         **RESOURCES,
     params:
         lock=LOCK,
-        probeqcdir=RUN_DIR,
+        results_dir=str(RES_DIR)
     shell:
         """
         if [ {params.lock} = true ]; then
-            chmod -R a-w {params.probeqcdir}
+            chmod -R a-w "{params.results_dir}"
         fi
         echo "=======> All done! <======="
         """
@@ -432,7 +299,7 @@ rule full:
 
 rule probeQC_mtx:
     input:
-        lambda wc: INPUT_BY_SAMPLE[wc.sample],
+        str(H5AD_DIR / "{sample}.h5ad"),
     output:
         MTXQC_OUTPUTS,
     log:
@@ -508,7 +375,7 @@ rule probeQC_derived:
             --runFOVqc "{params.run_fov_qc}" \
             >"{log}" 2>&1
         """
-
+ 
 
 rule flag_probeQC:
     input:
@@ -550,7 +417,7 @@ rule probeQC_report:
     input:
         metrics=os.path.join(
             str(QC_DIR),
-            f"{RUN_NAME}_cellQCmetrics.csv",
+            f"{RUN_NAME}_instanceQCmetrics.csv",
         ),
         thresholds=str(QC_THRESHOLDS),
         report_source=str(PROBEQC_REPORT_RMD),
@@ -559,7 +426,7 @@ rule probeQC_report:
     output:
         html=os.path.join(
             str(REPORT_DIR),
-            f"probeqc_{RUN_NAME}_cell.html",
+            f"probeqc_{RUN_NAME}_instance.html",
         ),
     params:
         report_dir=str(REPORT_DIR),
@@ -567,15 +434,15 @@ rule probeQC_report:
         group=config["group"],
 
         # QC thresholds
-        cell_nCount_cutoff=qc_thresholds["cell_nCount_cutoff"],
-        cell_nFeature_cutoff=qc_thresholds["cell_nFeature_cutoff"],
-        cell_percentNeg_cutoff=qc_thresholds["cell_percentNeg_cutoff"],
-        cell_complexity_cutoff=qc_thresholds["cell_complexity_cutoff"],
-        sampleMinCells=qc_thresholds["sampleMinCells"],
+        instance_nCount_cutoff=qc_thresholds["instance_nCount_cutoff"],
+        instance_nFeature_cutoff=qc_thresholds["instance_nFeature_cutoff"],
+        instance_percentNeg_cutoff=qc_thresholds["instance_percentNeg_cutoff"],
+        instance_complexity_cutoff=qc_thresholds["instance_complexity_cutoff"],
+        sampleMinInstances=qc_thresholds["sampleMinInstances"],
         sampleMinPercent=qc_thresholds["sampleMinPercent"],
-        exclCellsInFailedFOVs=(
+        exclInstancesInFailedFOVs=(
             "TRUE"
-            if qc_thresholds["exclCellsInFailedFOVs"]
+            if qc_thresholds["exclInstancesInFailedFOVs"]
             else "FALSE"
         ),
 
@@ -598,24 +465,24 @@ rule probeQC_report:
         """
         mkdir -p "{params.report_dir}"
 
-        cp --update "{input.report_source}" "{params.run_dir}/probeqc_cell_report.Rmd"
+        cp --update "{input.report_source}" "{params.run_dir}/probeqc_instance_report.Rmd"
         cp --update "{input.header_source}" "{params.run_dir}/probeqc_header.Rmd"
         cp --update "{input.graphical_params_source}" "{params.run_dir}/_graphical_params.Rmd"
 
         Rscript -e '
         rmarkdown::render(
-            input = "{params.run_dir}/probeqc_cell_report.Rmd",
-            output_file = "probeqc_{RUN_NAME}_cell.html",
+            input = "{params.run_dir}/probeqc_instance_report.Rmd",
+            output_file = "probeqc_{RUN_NAME}_instance.html",
             output_dir = "{params.report_dir}",
             params = list(
                 group = "{params.group}",
-                cell_nCount_cutoff = {params.cell_nCount_cutoff},
-                cell_nFeature_cutoff = {params.cell_nFeature_cutoff},
-                cell_percentNeg_cutoff = {params.cell_percentNeg_cutoff},
-                cell_complexity_cutoff = {params.cell_complexity_cutoff},
-                sampleMinCells = {params.sampleMinCells},
+                instance_nCount_cutoff = {params.instance_nCount_cutoff},
+                instance_nFeature_cutoff = {params.instance_nFeature_cutoff},
+                instance_percentNeg_cutoff = {params.instance_percentNeg_cutoff},
+                instance_complexity_cutoff = {params.instance_complexity_cutoff},
+                sampleMinInstances = {params.sampleMinInstances},
                 sampleMinPercent = {params.sampleMinPercent},
-                exclCellsInFailedFOVs = {params.exclCellsInFailedFOVs},
+                exclInstancesInFailedFOVs = {params.exclInstancesInFailedFOVs},
                 composite_ncol = {params.composite_ncol},
                 composite_spacing = {params.composite_spacing},
                 plot_ncol_spatial = {params.plot_ncol_spatial},
@@ -631,7 +498,7 @@ rule probeQC_report_FOV:
     input:
         metrics=os.path.join(
             str(QC_DIR),
-            f"{RUN_NAME}_cellQCmetrics.csv",
+            f"{RUN_NAME}_instanceQCmetrics.csv",
         ),
         thresholds=str(QC_THRESHOLDS),
         report_source=str(PROBEQC_REPORT_FOV_RMD),
@@ -674,10 +541,10 @@ rule probeQC_report_FOV:
         """
         mkdir -p "{params.report_dir}"
 
-        cp --update "{input.report_source}" "{params.run_dir}/probeqc_fov_report.Rmd"
-        cp --update "{input.bruker_source}" "{params.run_dir}/probeqc_bruker.Rmd"
-        cp --update "{input.header_source}" "{params.run_dir}/probeqc_header.Rmd"
-        cp --update "{input.graphical_params_source}" "{params.run_dir}/_graphical_params.Rmd"
+        cp --no-clobber "{input.report_source}" "{params.run_dir}/probeqc_fov_report.Rmd"
+        cp --no-clobber "{input.bruker_source}" "{params.run_dir}/probeqc_bruker.Rmd"
+        cp --no-clobber "{input.header_source}" "{params.run_dir}/probeqc_header.Rmd"
+        cp --no-clobber "{input.graphical_params_source}" "{params.run_dir}/_graphical_params.Rmd"
 
         Rscript -e '
         rmarkdown::render(

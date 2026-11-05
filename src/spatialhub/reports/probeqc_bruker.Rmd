@@ -6,7 +6,7 @@
 
 ### Any instrument failure
 
-This may notably include low average `nCount_RNA` per cell, and is thus redundant with the above.
+This may notably include low average `nCount_RNA` per instance, and is thus redundant with the above.
 
 ```{r instr_failure, fig.height=12L}
 spx_meta$qcFlagInstr <- factor(as.character(spx_meta$qcFlagInstr), levels = c("Pass", "Fail"))

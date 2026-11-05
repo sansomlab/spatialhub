@@ -12,7 +12,7 @@ metadata_file: /path/to/file/containing/sample-level/metadata.csv
     # minimally, this table must include 'sample_id' (matching the one used to name per-sample H5AD files)
     # 'slide_id' (even if a single slide was analyzed).
     # Optional variables include condition, and any other experimental metadata.
-
+outdir: /path/to/output/directory/for/probeqc
 
 # Regex pattern to use for finding background (negative) and positive control probes in the panel.
 background: Negative

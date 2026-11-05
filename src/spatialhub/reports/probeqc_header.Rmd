@@ -6,11 +6,11 @@ params <- list(
   group = "tissue",
   composite_ncol = 2,
   composite_spacing = 600,
-  cell_nCount_cutoff = 50,
-  cell_nFeature_cutoff = 20,
-  cell_percentNeg_cutoff = 1,
-  cell_complexity_cutoff = 1.05,
-  exclCellsInFailedFOVs = TRUE,
+  instance_nCount_cutoff = 50,
+  instance_nFeature_cutoff = 20,
+  instance_percentNeg_cutoff = 1,
+  instance_complexity_cutoff = 1.05,
+  exclInstancesInFailedFOVs = TRUE,
   plot_ncol_spatial = 4,
   plot_ncol = 2,
   font_size = 10,
@@ -26,12 +26,12 @@ params <- list(
 
 ## Data import
 
-Importing cell-level QC metrics and metadata from `spatialhub` probeqc pipeline:
+Importing instance-level QC metrics and metadata from `spatialhub` probeqc pipeline:
 
 ```{r import_data}
 # Import QC metrics
 probeqc_files <- list.files('.', full.names = TRUE)
-qcmetrics_file <- probeqc_files[grep("_cellQCmetrics\\.csv$", probeqc_files)]  # output from pipeline probeqc
+qcmetrics_file <- probeqc_files[grep("_instanceQCmetrics\\.csv$", probeqc_files)]  # output from pipeline probeqc
 spx_meta <- read.csv(qcmetrics_file)
 
 # Define study-specific contrast variable (notably, to split plots)
@@ -52,7 +52,7 @@ makeCompositeSlide <- function(spx_meta, sample_key = NA,
     # sample_key: name of column in spatial metadata object where the unique sample identifier
     #   (taking into account the source slide) is stored
     #   Defaults to 'sample_id' x 'slide_id' if not specified
-    # spacing: blank space to leave between samples (in same unit as cell coordinates)
+    # spacing: blank space to leave between samples (in same unit as instance coordinates)
     # n_col: number of columns in the composite slide
     # composite_id: identifier for the composite slide, if splitting the dataset into several
 

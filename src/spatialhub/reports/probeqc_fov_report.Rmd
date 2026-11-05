@@ -88,13 +88,13 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
 ```
 
 
-Before QC, each sample totals the following number of cells:
+Before QC, each sample totals the following number of instances:
 
 ```{r}
-qc_sample <- spx_meta[, c("sample_id", "nCell_sampleSum")]
+qc_sample <- spx_meta[, c("sample_id", "nInstance_sampleSum")]
 qc_sample <- qc_sample[!duplicated(qc_sample), ]
 rownames(qc_sample) <- 1:nrow(qc_sample)
-qc_sample |> dplyr::arrange(desc(nCell_sampleSum))
+qc_sample |> dplyr::arrange(desc(nInstance_sampleSum))
 ```
 
 * * *
@@ -109,7 +109,7 @@ qc_sample |> dplyr::arrange(desc(nCell_sampleSum))
 
 ## Visual assessment of variation in space {.tabset}
 
-### Total counts per cell
+### Total counts per instance
 
 ```{r, fig.height=12L}
 gg_slide <- list()
@@ -132,7 +132,7 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
 
 ***
 
-### FOV average counts per cell
+### FOV average counts per instance
 
 ```{r, fig.height=12L}
 gg_slide <- list()
@@ -178,7 +178,7 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
 
 ***
 
-### Total cells per FOV
+### Total instances per FOV
 
 ```{r, fig.height=12L}
 gg_slide <- list()
@@ -186,8 +186,8 @@ for (slide in sort(unique(spx_meta$slide_id))) {
 
   g <- spx_meta |>
     dplyr::filter(slide_id == slide) |>  
-    dplyr::arrange(nCell_FOVsum) |> 
-    ggplot(aes(x = CenterX_composite, y = CenterY_composite, color = nCell_FOVsum)) +
+    dplyr::arrange(nInstance_FOVsum) |> 
+    ggplot(aes(x = CenterX_composite, y = CenterY_composite, color = nInstance_FOVsum)) +
     geom_point(size = 0.1) + theme_classic(base_size = font_size) +
     scale_color_gradient(low = "grey75", high = "blue") +
     ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
@@ -202,13 +202,13 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
 ***
 
 
-## Distribution of transcripts per cell within each FOV {.tabset}
+## Distribution of transcripts per instance within each FOV {.tabset}
 
-**Number of Pass/Fail per sample at user-defined threshold for mean `nCount_RNA` per cell:**
+**Number of Pass/Fail per sample at user-defined threshold for mean `nCount_RNA` per instance:**
 
 ```{r}
 FOV_nCount_low <- min(qc_fov$nCount_RNA_FOVavg[qc_fov$qcFlagFOV_nCount == "Pass"], na.rm = TRUE)
-print(paste0("Lowest mean `nCount_RNA` per cell in FOVs that passed QC: ", 
+print(paste0("Lowest mean `nCount_RNA` per instance in FOVs that passed QC: ", 
              round(FOV_nCount_low, 3)))
 
 # Reminder: by default, the cutoff is set to 50 (unless otherwise specified in the YAML file)
@@ -221,8 +221,8 @@ c50percent <- round(prop.table(c50, margin = 1) * 100, 1)
 df <- cbind(f50, f50percent, c50, c50percent)
 colnames(df) <- c("Total failed FOVs", "Total passed FOVs",
                   "Percent failed FOVs", "Percent passed FOVs",
-                  "Total cells in failed FOVs", "Total cells in passed FOVs",
-                  "Percent cells in failed FOVs", "Percent cells in passed FOVs"
+                  "Total instances in failed FOVs", "Total instances in passed FOVs",
+                  "Percent instances in failed FOVs", "Percent instances in passed FOVs"
                   )
 df |> as.data.frame()
 ```
@@ -250,7 +250,7 @@ for (slide in sort(unique(qc_fov$slide_id))) {
     dplyr::arrange(nCount_RNA_FOVavg) |>
     ggplot(aes(x = nCount_RNA_FOVavg, y = sample_id, fill = group)) +
     geom_violin() + geom_boxplot(fill = "white", width = 0.15) + geom_jitter(width = 0, height = 0.1, size = 0.8) +
-    xlab("Average nCount_RNA per cell per FOV") + 
+    xlab("Average nCount_RNA per instance per FOV") + 
     geom_vline(xintercept = floor(FOV_nCount_low), lty = 2) +
     theme_classic(base_size = font_size) +
     ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
@@ -275,7 +275,7 @@ for (slide in sort(unique(qc_fov$slide_id))) {
     dplyr::arrange(nCount_RNA_FOVavg) |>
     ggplot(aes(x = nCount_RNA_FOVavg, y = group, fill = group)) +
     geom_violin() + geom_boxplot(fill = "white", width = 0.15) + geom_jitter(width = 0, height = 0.1, size = 0.8) +
-    xlab("Average nCount_RNA per cell per FOV") + 
+    xlab("Average nCount_RNA per instance per FOV") + 
     geom_vline(xintercept = floor(FOV_nCount_low), lty = 2) +
     theme_classic(base_size = font_size) +
     ggtitle(slide) + theme(plot.title = element_text(hjust = 0.5)) +
@@ -291,7 +291,7 @@ do.call("grid.arrange", c(gg_slide, nrow = plot_ncol))
 
 ### Spatial plot
 
-This spatial plot flags cells in FOVs with low average `nCount_RNA` per cell across the FOV.
+This spatial plot flags instances in FOVs with low average `nCount_RNA` per instance across the FOV.
 
 ```{r, fig.height=12L}
 spx_meta$qcFlagFOV_nCount <- factor(as.character(spx_meta$qcFlagFOV_nCount), levels = c("Pass", "Fail"))
@@ -339,8 +339,8 @@ c50percent <- round(prop.table(c50, margin = 1) * 100, 1)
 df <- cbind(f50, f50percent, c50, c50percent)
 colnames(df) <- c("Total failed FOVs", "Total passed FOVs",
                   "Percent failed FOVs", "Percent passed FOVs",
-                  "Total cells in failed FOVs", "Total cells in passed FOVs",
-                  "Percent cells in failed FOVs", "Percent cells in passed FOVs"
+                  "Total instances in failed FOVs", "Total instances in passed FOVs",
+                  "Percent instances in failed FOVs", "Percent instances in passed FOVs"
                   )
 df |> as.data.frame()
 ```
@@ -407,7 +407,7 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol))
 
 ### Spatial plot
 
-This spatial plot flags cells in FOVs with low signal to noise ratio (SNR).
+This spatial plot flags instances in FOVs with low signal to noise ratio (SNR).
 
 ```{r, fig.height=12L}
 spx_meta$qcFlagFOV_SNR <- factor(as.character(spx_meta$qcFlagFOV_SNR), levels = c("Pass", "Fail"))
@@ -445,7 +445,7 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
 
 The following plot flags FOVs that failed on any of the following FOV QC metrics:
 
-- Average `nCount_RNA` per cell below user-specified threshold
+- Average `nCount_RNA` per instance below user-specified threshold
 - Signal to noise ratio (SNR) below user-specified threshold
 - Instrument failure introducing gene bias (if Bruker FOV QC tool was run)
 
@@ -476,12 +476,12 @@ do.call("grid.arrange", c(gg_slide, ncol = plot_ncol_spatial))
 
 It can be helpful to review FOV QC alongside sample quality. As a reminder, **`spatialhub` flags a sample as low-quality whenever either of the following condition applies**:
 
-- Fewer than the user-specified minimum number of cells per sample are left after excluding low-quality cells;
-- Fewer than the user-specified percentage of cells are left for that sample after excluding low-quality cells.
+- Fewer than the user-specified minimum number of instances per sample are left after excluding low-quality instances;
+- Fewer than the user-specified percentage of instances are left for that sample after excluding low-quality instances.
 
-Low-quality cells are those that failed on any of the cell-level QC metrics (see companion report for details), as well as, if `exclCellsInFailedFOVs` is set to true, those that fall within a low-quality FOV (as defined in the plot above).
+Low-quality instances are those that failed on any of the instance-level QC metrics (see companion report for details), as well as, if `exclInstancesInFailedFOVs` is set to true, those that fall within a low-quality FOV (as defined in the plot above).
 
-**Important note: by default, low-quality FOVs are _not_ excluded (unless they led to the exclusion of the sample as a whole).** We have found that cells within these FOVs are not necessarily harder to annotate than others using label transfer approaches, and can thus be considered in analyses relying on cell types (e.g. compositional analyses, spatial metrics between cell types...); **however, cells in these FOVs should be removed from analyses such as differential gene expression and any other analysis where they show a different behavior (e.g. de novo clustering).**
+**Important note: by default, low-quality FOVs are _not_ excluded (unless they led to the exclusion of the sample as a whole).** We have found that instances within these FOVs are not necessarily harder to annotate than others using label transfer approaches, and can thus be considered in analyses relying on instance types (e.g. compositional analyses, spatial metrics between instance types...); **however, instances in these FOVs should be removed from analyses such as differential gene expression and any other analysis where they show a different behavior (e.g. de novo clustering).**
 
 ```{r, fig.height=12L}
 spx_meta$qcFlagSample_summary <- factor(as.character(spx_meta$qcFlagSample_summary), levels = c("Pass", "Fail"))
