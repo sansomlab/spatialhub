@@ -67,6 +67,14 @@ WORKFLOWS = {
         "Add shapes to a SpatialData (Zarr) file.",
         [],
     ),
+    "sopaSegmentImage": (
+        "Run Cellpose segmentation using SOPA.",
+        [],
+    ),
+    "sopaSegmentTranscripts": (
+        "Run baysor/proseg segmentation using SOPA.",
+        [],
+    ), 
 }
 
 

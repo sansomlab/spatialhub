@@ -1,0 +1,59 @@
+resources:
+    account: slurm_account
+    threads: 2
+    mem_mb: 128000
+    time: "30:00:00"
+    partition: "short"
+
+
+# Input SpatialData Zarr directory
+zarr_dir: "spatialdata.dir"
+
+# Optional explicit sample selection (for example, to pilot segmentation on a subset of samples)
+# Set to null to discover all .zarr directories.
+sample_ids: null
+
+# Output segmentation directory
+segment_dir: "sopa.segment.dir"
+
+
+# Setup for segmentation - image-based or transcripts-based
+segmentation_mode: image
+
+# Elements from input SpatialData object to draw from for segmentation
+image_key: 'image'
+points_key: 'main'
+prior_segment_key: 'atomx'
+
+# Segmentation to run
+run_cellpose: true
+run_stardist: true
+
+# SOPA patching
+img_patch_width: 2000
+img_patch_ovlp: 100
+
+# Cellpose configuration
+cp_config:
+    model: "cpsam_2"
+    channels: ['DNA', 'Membrane']
+    cell_diameter: 30
+    flow_thresh: 0.4
+    prob_thresh: 0.0
+    clip_limit: 0.2
+    clahe_kernel_size:
+    gaussian_sigma: 1.0
+cp_cell_area: 100  # post-hoc SOPA filtering
+cp_mask_key: "cellpose_cpsam2"
+
+# Stardist configuration
+sd_config:
+    model: "2D_versatile_fluo"
+    channels: 'DNA'
+    prob_thresh: 0.2
+    nms_thresh: 0.6
+    clip_limit: 0.2
+    clahe_kernel_size:
+    gaussian_sigma: 1.0
+sd_nucleus_area: 30  # post-hoc SOPA filtering
+sd_mask_key: "stardist_fluo"
