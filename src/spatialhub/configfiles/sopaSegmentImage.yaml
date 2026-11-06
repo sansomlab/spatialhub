@@ -17,16 +17,12 @@ sample_ids: null
 segment_dir: "sopa.segment.dir"
 overwrite_mask: false  # whether to overwrite existing segmentation masks in the output directory if using the same mask_key
 
-
-# Setup for segmentation - image-based or transcripts-based
-segmentation_mode: image
-
-# Elements from input SpatialData object to draw from for segmentation
+# Image from input SpatialData object to draw from for segmentation
+# This should be in GLOBAL coordinates system (necessary for successful registration)
 image_key: 'image'
-points_key: 'main'
-prior_segment_key: 'atomx'
 
 # Segmentation to run
+# cannot run both simultaneously in beta release
 run_cellpose: true
 run_stardist: true
 

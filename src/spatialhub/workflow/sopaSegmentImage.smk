@@ -31,12 +31,6 @@ import json
 
 configfile: "sopaSegmentImage.yaml"
 
-# [NOTE] this key is set by the CLI, not the config file!
-if "lock" in config:
-    LOCK = config["lock"].lower()
-else:
-    LOCK = "false"
-
 RESOURCES = {"threads": 4, "mem_mb": 16000, "time": "04:00:00", "partition": "short"}
 RESOURCES.update(config.get("resources", {}))
 
@@ -85,8 +79,13 @@ if RUN_CELLPOSE:
         if isinstance(channels, str):
             channels = channels.split(",")
 
+        channels = [str(c).strip() for c in channels]
+
+        if not channels or any(not c for c in channels):
+            raise ValueError("Invalid Cellpose channels.")
+
         return " ".join(
-            f"--channels {shlex.quote(str(c).strip())}"
+            f"--channels {shlex.quote(c)}"
             for c in channels
         )
 
@@ -97,6 +96,11 @@ if RUN_STARDIST:
 
     SD_CONFIG = config["sd_config"]
     SD_MASK_KEY = config["sd_mask_key"]
+
+    if not Path(SD_CONFIG["model_path"]).is_dir():
+        raise FileNotFoundError(
+            f"StarDist model not found: {SD_CONFIG['model_path']}"
+        )
 
     SD_PARAMS = {
         "patch_width": PATCH_WIDTH,
@@ -117,7 +121,7 @@ if RUN_STARDIST:
 
 if config.get("sample_ids") is not None:
     SAMPLE_IDS = config["sample_ids"]
-
+    
     if isinstance(SAMPLE_IDS, str):
         SAMPLE_IDS = [s.strip() for s in SAMPLE_IDS.split(",")]
 
@@ -185,24 +189,6 @@ for method, settings in REGISTRATION.items():
         hash=settings["hash"],
     )
 
-if RUN_CELLPOSE:
-    TARGETS += expand(
-        str(
-            SEGMENT_DIR /
-            f"patches/{{sample}}/cellposeResolve_{CP_MASK_KEY}_{CP_HASH}.sentinel"
-        ),
-        sample=SAMPLE_IDS,
-    )
-
-if RUN_STARDIST:
-    TARGETS += expand(
-        str(
-            SEGMENT_DIR /
-            f"patches/{{sample}}/stardistResolve_{SD_MASK_KEY}_{SD_HASH}.sentinel"
-        ),
-        sample=SAMPLE_IDS,
-    )
-
 if not TARGETS:
     TARGETS = expand(
         str(SEGMENT_DIR / "logs/{sample}_sopa_segmentSetup.sentinel"),
@@ -213,8 +199,6 @@ if not TARGETS:
 rule full:
     input:
         TARGETS
-    params:
-        lock=LOCK
     resources:
         **RESOURCES
     shell:
@@ -239,16 +223,6 @@ rule segment_setup:
             if config.get("image_key")
             else ""
         ),
-        points=(
-            f"--points {shlex.quote(str(config['points_key']))}"
-            if config.get("points_key")
-            else ""
-        ),
-        prior=(
-            f"--prior {shlex.quote(str(config['prior_segment_key']))}"
-            if config.get("prior_segment_key")
-            else ""
-        ),
     resources:
         **RESOURCES,
     log:
@@ -260,10 +234,10 @@ rule segment_setup:
             --output-zarr {params.zarr:q} \
             --segmentation-mode {params.mode} \
             {params.image} \
-            {params.points} \
-            {params.prior} \
             --overwrite \
             > {log:q} 2>&1
+
+        test -d {params.zarr:q}
         """
 
 
@@ -273,7 +247,7 @@ checkpoint sopa_image_patch:
     input:
         str(SEGMENT_DIR / "logs/{sample}_sopa_segmentSetup.sentinel")
     output:
-        patch_indices=str(SEGMENT_DIR / "patches/{sample}_image.indices")
+        patch_count=str(SEGMENT_DIR / "patches/{sample}_image.count")
     params:
         zarr=segment_zarr,
         width=config["img_patch_width"],
@@ -281,7 +255,7 @@ checkpoint sopa_image_patch:
     resources:
         **RESOURCES,
     log:
-        str(SEGMENT_DIR / "logs/{sample}_patchIamge.log")
+        str(SEGMENT_DIR / "logs/{sample}_patchImage.log")
     run:
         command = [
             "sopa", "patchify", "image", params.zarr,
@@ -315,19 +289,19 @@ checkpoint sopa_image_patch:
         if n_patches < 1:
             raise ValueError("No image patches were generated.")
 
-        with open(output.patch_indices, "w") as handle:
+        with open(output.patch_count, "w") as handle:
             handle.write(f"{n_patches}\n")
 
 
 
 # ----------------------- Patch output parsing ----------------------- #
 
-def get_patch_indices(wildcards):
+def get_patch_count(wildcards):
     ckpt = checkpoints.sopa_image_patch.get(
         sample=wildcards.sample
     )
 
-    with open(ckpt.output.patch_indices) as handle:
+    with open(ckpt.output.patch_count) as handle:
         n_patches = int(handle.read().strip())
 
     if n_patches < 1:
@@ -339,28 +313,26 @@ def get_patch_indices(wildcards):
 
 
 if RUN_CELLPOSE:
-
     def cellpose_patch_outputs(wildcards):
         return expand(
             str(
                 SEGMENT_DIR /
-                f"patches/{{sample}}/cellposeSegment_{CP_MASK_KEY}_{CP_HASH}_{{patch}}.sentinel"
+                f"{{sample}}.zarr/.sopa_cache/{CP_CACHE}/{{patch}}.parquet"
             ),
             sample=wildcards.sample,
-            patch=range(get_patch_indices(wildcards)),
+            patch=range(get_patch_count(wildcards)),
         )
 
 
 if RUN_STARDIST:
-
     def stardist_patch_outputs(wildcards):
         return expand(
             str(
                 SEGMENT_DIR /
-                f"patches/{{sample}}/stardistSegment_{SD_MASK_KEY}_{SD_HASH}_{{patch}}.sentinel"
+                f"{{sample}}.zarr/.sopa_cache/{SD_CACHE}/{{patch}}.parquet"
             ),
             sample=wildcards.sample,
-            patch=range(get_patch_indices(wildcards)),
+            patch=range(get_patch_count(wildcards)),
         )
 
 
@@ -370,13 +342,11 @@ if RUN_CELLPOSE:
 
     rule sopa_segment_cellpose:
         input:
-            str(SEGMENT_DIR / "patches/{sample}_image.indices")
+            str(SEGMENT_DIR / "patches/{sample}_image.count")
         output:
-            sentinel=touch(
-                str(
-                    SEGMENT_DIR /
-                    f"patches/{{sample}}/cellposeSegment_{CP_MASK_KEY}_{CP_HASH}_{{patch}}.sentinel"
-                )
+            parquet=str(
+                SEGMENT_DIR /
+                f"{{sample}}.zarr/.sopa_cache/{CP_CACHE}/{{patch}}.parquet"
             )
         params:
             zarr=segment_zarr,
@@ -428,13 +398,11 @@ if RUN_STARDIST:
 
     rule sopa_segment_stardist:
         input:
-            str(SEGMENT_DIR / "patches/{sample}_image.indices")
+            str(SEGMENT_DIR / "patches/{sample}_image.count")
         output:
-            sentinel=touch(
-                str(
-                    SEGMENT_DIR /
-                    f"patches/{{sample}}/stardistSegment_{SD_MASK_KEY}_{SD_HASH}_{{patch}}.sentinel"
-                )
+            parquet=str(
+                SEGMENT_DIR /
+                f"{{sample}}.zarr/.sopa_cache/{SD_CACHE}/{{patch}}.parquet"
             )
         params:
             zarr=segment_zarr,
