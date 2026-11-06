@@ -23,6 +23,11 @@ def main():
     parser.add_argument("--source-key", required=True)
     parser.add_argument("--mask-key", required=True)
     parser.add_argument("--image-key", default="image")
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace an existing segmentation with the same mask key.",
+    )
 
     args = parser.parse_args()
 
@@ -52,9 +57,20 @@ def main():
         )
 
     if args.mask_key in sdata_original:
-        raise FileExistsError(
-            f"Element '{args.mask_key}' already exists."
-        )
+        if not args.overwrite:
+            raise FileExistsError(
+                f"Element '{args.mask_key}' already exists. "
+                "Use --overwrite to replace it."
+            )
+
+        if args.mask_key not in sdata_original.shapes:
+            raise ValueError(
+                f"Element '{args.mask_key}' exists but is not a shapes element."
+            )
+
+        print(f"Overwriting existing segmentation: {args.mask_key}")
+        sdata_original.delete_element_from_disk(args.mask_key)
+        del sdata_original[args.mask_key]
 
     if 'image' not in sdata_seg.images:
         raise KeyError(

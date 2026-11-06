@@ -154,7 +154,36 @@ def segment_zarr(wildcards):
 
 # ----------------------- Targets ----------------------- #
 
+# Registration parameters
+REGISTRATION = {}
+
+if RUN_CELLPOSE:
+    REGISTRATION["cellpose"] = {
+        "source_key": "cellpose_boundaries",
+        "mask_key": CP_MASK_KEY,
+        "hash": CP_HASH,
+    }
+
+if RUN_STARDIST:
+    REGISTRATION["stardist"] = {
+        "source_key": "stardist_boundaries",
+        "mask_key": SD_MASK_KEY,
+        "hash": SD_HASH,
+    }
+
+
 TARGETS = []
+
+for method, settings in REGISTRATION.items():
+    TARGETS += expand(
+        str(
+            SEGMENT_DIR /
+            "logs/{sample}_sopaRegister_{method}_{hash}.sentinel"
+        ),
+        sample=SAMPLE_IDS,
+        method=method,
+        hash=settings["hash"],
+    )
 
 if RUN_CELLPOSE:
     TARGETS += expand(
@@ -399,7 +428,7 @@ if RUN_STARDIST:
 
     rule sopa_segment_stardist:
         input:
-            str(SEGMENT_DIR / "patches/{sample}_image.count")
+            str(SEGMENT_DIR / "patches/{sample}_image.indices")
         output:
             sentinel=touch(
                 str(
@@ -462,13 +491,10 @@ if RUN_CELLPOSE:
                     SEGMENT_DIR /
                     f"patches/{{sample}}/cellposeResolve_{CP_MASK_KEY}_{CP_HASH}.sentinel"
                 )
-            )
+            ),
         params:
             zarr=segment_zarr,
-            original_zarr=input_zarr,
             cache=CP_CACHE,
-            mask_key=CP_MASK_KEY,
-            image_key=config.get("image_key", "image"),
         resources:
             **RESOURCES
         log:
@@ -476,39 +502,12 @@ if RUN_CELLPOSE:
                 SEGMENT_DIR /
                 f"logs/{{sample}}_sopaResolve_{CP_MASK_KEY}_{CP_HASH}.log"
             )
-        run:
-            import sys
-
-            command = [
-                "sopa", "resolve", "cellpose", params.zarr,
-                "--cache-dir-name", params.cache,
-            ]
-
-            with open(log[0], "w") as handle:
-                subprocess.run(
-                    command,
-                    stdout=handle,
-                    stderr=subprocess.STDOUT,
-                    check=True,
-                )
-
-            command = [
-                sys.executable,
-                "-m", "spatialhub.scripts.sopaRegisterMask",
-                "--input-zarr", params.zarr,
-                "--output-zarr", params.original_zarr,
-                "--source-key", "cellpose_boundaries",
-                "--mask-key", params.mask_key,
-                "--image-key", params.image_key,
-            ]
-
-            with open(log[0], "a") as handle:
-                subprocess.run(
-                    command,
-                    stdout=handle,
-                    stderr=subprocess.STDOUT,
-                    check=True,
-                )
+        shell:
+            """
+            sopa resolve cellpose {params.zarr:q} \
+                --cache-dir-name {params.cache:q} \
+                > {log:q} 2>&1
+            """
 
 
 # ----------------------- StarDist resolution ----------------------- #
@@ -524,13 +523,10 @@ if RUN_STARDIST:
                     SEGMENT_DIR /
                     f"patches/{{sample}}/stardistResolve_{SD_MASK_KEY}_{SD_HASH}.sentinel"
                 )
-            )
+            ),
         params:
             zarr=segment_zarr,
-            original_zarr=input_zarr,
             cache=SD_CACHE,
-            mask_key=SD_MASK_KEY,
-            image_key=config.get("image_key", "image"),
         resources:
             **RESOURCES
         log:
@@ -538,36 +534,84 @@ if RUN_STARDIST:
                 SEGMENT_DIR /
                 f"logs/{{sample}}_sopaResolve_{SD_MASK_KEY}_{SD_HASH}.log"
             )
-        run:
-            import sys
+        shell:
+            """
+            sopa resolve stardist {params.zarr:q} \
+                --cache-dir-name {params.cache:q} \
+                > {log:q} 2>&1
+            """
 
-            command = [
-                "sopa", "resolve", "stardist", params.zarr,
-                "--cache-dir-name", params.cache,
-            ]
 
-            with open(log[0], "w") as handle:
-                subprocess.run(
-                    command,
-                    stdout=handle,
-                    stderr=subprocess.STDOUT,
-                    check=True,
-                )
+# ----------------------- Registration to source zarr ----------------------- #
 
-            command = [
-                sys.executable,
-                "-m", "spatialhub.scripts.sopaRegisterMask",
-                "--input-zarr", params.zarr,
-                "--output-zarr", params.original_zarr,
-                "--source-key", "stardist_boundaries",
-                "--mask-key", params.mask_key,
-                "--image-key", params.image_key,
-            ]
+def registration_source(wildcards):
+    method = wildcards.method
 
-            with open(log[0], "a") as handle:
-                subprocess.run(
-                    command,
-                    stdout=handle,
-                    stderr=subprocess.STDOUT,
-                    check=True,
-                )
+    if method not in REGISTRATION:
+        raise ValueError(f"Unknown segmentation method: {method}")
+
+    expected_hash = REGISTRATION[method]["hash"]
+
+    if wildcards.hash != expected_hash:
+        raise ValueError(
+            f"Configuration hash mismatch for {method}: "
+            f"{wildcards.hash} != {expected_hash}"
+        )
+
+    return str(
+        SEGMENT_DIR /
+        f"patches/{wildcards.sample}/"
+        f"{method}Resolve_{REGISTRATION[method]['mask_key']}_{expected_hash}.sentinel"
+    )
+
+
+rule sopa_register_mask:
+    input:
+        sentinel=registration_source
+    output:
+        sentinel=touch(
+            str(
+                SEGMENT_DIR /
+                "logs/{sample}_sopaRegister_{method}_{hash}.sentinel"
+            )
+        )
+    params:
+        zarr=segment_zarr,
+        original_zarr=input_zarr,
+        source_key=lambda wc: REGISTRATION[wc.method]["source_key"],
+        mask_key=lambda wc: REGISTRATION[wc.method]["mask_key"],
+        image_key=config.get("image_key", "image"),
+        overwrite=config.get("overwrite_mask", False),
+    wildcard_constraints:
+        method="cellpose|stardist",
+        hash=r"[0-9a-f]{12}"
+    resources:
+        **RESOURCES
+    log:
+        str(
+            SEGMENT_DIR /
+            "logs/{sample}_sopaRegister_{method}_{hash}.log"
+        )
+    run:
+        import sys
+
+        command = [
+            sys.executable,
+            "-m", "spatialhub.scripts.sopaRegisterMask",
+            "--input-zarr", params.zarr,
+            "--output-zarr", params.original_zarr,
+            "--source-key", params.source_key,
+            "--mask-key", params.mask_key,
+            "--image-key", params.image_key,
+        ]
+
+        if params.overwrite:
+            command.append("--overwrite")
+
+        with open(log[0], "w") as handle:
+            subprocess.run(
+                command,
+                stdout=handle,
+                stderr=subprocess.STDOUT,
+                check=True,
+            )

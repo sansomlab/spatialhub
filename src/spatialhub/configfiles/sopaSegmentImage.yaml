@@ -15,6 +15,7 @@ sample_ids: null
 
 # Output segmentation directory
 segment_dir: "sopa.segment.dir"
+overwrite_mask: false  # whether to overwrite existing segmentation masks in the output directory if using the same mask_key
 
 
 # Setup for segmentation - image-based or transcripts-based
