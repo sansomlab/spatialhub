@@ -23,6 +23,7 @@ dependencies = [
     "sopa[cellpose]",
     "ipykernel",
     "rich-argparse",
+    "sopa[cellpose,stardist,baysor]"
 ]
 requires-python = ">=3.12"
 readme = "README.md"

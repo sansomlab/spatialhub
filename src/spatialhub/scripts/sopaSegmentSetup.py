@@ -118,6 +118,10 @@ def main():
     print(f"Retaining elements: {elements}")
     sdata = sdata.subset(elements)
 
+    if args.image != "image":
+        sdata["image"] = sdata[args.image]
+        del sdata[args.image]
+
     if args.segmentation_mode == "transcripts":
         if args.points != "transcripts":
             sdata["transcripts"] = sdata[args.points]
