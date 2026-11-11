@@ -123,7 +123,11 @@ if config.get("sample_ids") is not None:
     SAMPLE_IDS = config["sample_ids"]
     
     if isinstance(SAMPLE_IDS, str):
-        SAMPLE_IDS = [s.strip() for s in SAMPLE_IDS.split(",")]
+        SAMPLE_IDS = [
+            s.strip()
+            for s in SAMPLE_IDS.split(",")
+            if s.strip()
+        ]
 
 else:
     SAMPLE_IDS = sorted(

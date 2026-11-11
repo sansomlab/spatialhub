@@ -15,10 +15,8 @@ sample_ids: null
 
 # Output segmentation directory
 segment_dir: "sopa.segment.dir"
+overwrite_mask: false  # whether to overwrite existing segmentation masks in the output directory if using the same mask_key
 
-
-# Setup for segmentation - image-based or transcripts-based
-segmentation_mode: transcripts
 
 # Elements from input SpatialData object to draw from for segmentation
 image_key: 'image'
@@ -26,23 +24,15 @@ points_key: 'main'
 prior_segment_key: 'atomx_segments'
 
 # SOPA patch size (in pixels) and overlap (in pixels)
-img_patch_width: 2000
-img_patch_ovlp: 150
 tx_patch_width: 8000
 tx_patch_ovlp: 200
+tx_min_transcripts: 5000  # minimum transcripts per patch to enable downstream segmentation
+    # e.g. SOPA/baysor fails if there are <4000 transcripts in one patch (4000 set by SOPA developers)
 
 # Segmentation
-run_cellpose: false
+# only one at a time supported in beta release (zarr lock issues to be resolved)
 run_baysor: true
 run_proseg: true
-
-# Cellpose
-cp_model: "cpsam_2"
-cp_channels: ['DNA', 'Membrane']
-cp_cell_diameter: 30
-cp_cell_area: 100
-cp_flow_thresh: 0.4
-cp_prob_thresh: 0.0
 
 # Baysor
 bs_config:
@@ -73,6 +63,5 @@ bs_gene_column: "target"
 
 
 # Segmentation shape key
-cp_mask_key: "cellpose_cpsam2"
 bs_mask_key: "baysor"
 ps_mask_key: "proseg"

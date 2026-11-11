@@ -17,22 +17,17 @@ Stages:
 
 from pathlib import Path
 import shlex
-import re
+import shutil
 import subprocess
 import hashlib
 import json
 import spatialdata as spd
+import pandas as pd
 
 
 # ----------------------- Configuration ----------------------- #
 
 configfile: "sopaSegmentTranscripts.yaml"
-
-# [NOTE] this key is set by the CLI, not the config file!
-if "lock" in config:
-    LOCK = config["lock"].lower()
-else:
-    LOCK = "false"
 
 RESOURCES = {"threads": 4, "mem_mb": 16000, "time": "04:00:00", "partition": "short"}
 RESOURCES.update(config.get("resources", {}))
@@ -40,12 +35,23 @@ RESOURCES.update(config.get("resources", {}))
 ZARR_DIR = Path(config["zarr_dir"])
 SEGMENT_DIR = Path(config.get("segment_dir", "sopa.segment.dir"))
 
-RUN_BAYSOR = config.get("run_baysor", True)
+RUN_BAYSOR = config.get("run_baysor", False)
 RUN_PROSEG = config.get("run_proseg", False)
 
+# For beta release only!
+if RUN_BAYSOR and RUN_PROSEG:
+    raise ValueError(
+        "Running Baysor and Proseg together is not supported "
+        "in the beta release. Enable only one method."
+    )
+
+# Shared image patching parameters
+PATCH_WIDTH = config["tx_patch_width"]
+PATCH_OVERLAP = config["tx_patch_ovlp"]
+
 BS_PARAMS = {
-    "patch_width": config["tx_patch_width"],
-    "patch_overlap": config["tx_patch_ovlp"],
+    "patch_width": PATCH_WIDTH,
+    "patch_overlap": PATCH_OVERLAP,
     "baysor_config": config["bs_config"],
     "baysor_area": config["bs_cell_area"],
     "mask_key": config["bs_mask_key"],
@@ -55,7 +61,6 @@ BS_HASH = hashlib.sha256(
     json.dumps(BS_PARAMS, sort_keys=True).encode()
 ).hexdigest()[:12]
 
-BS_CACHE = f"baysor_{BS_HASH}"
 BS_MASK_KEY = config["bs_mask_key"]
 
 
@@ -63,7 +68,14 @@ BS_MASK_KEY = config["bs_mask_key"]
 
 if config.get("sample_ids") is not None:
     SAMPLE_IDS = config["sample_ids"]
-    # add check that this is a valid ID in the zarr path, with informative error
+
+    if isinstance(SAMPLE_IDS, str):
+        SAMPLE_IDS = [
+            s.strip()
+            for s in SAMPLE_IDS.split(",")
+            if s.strip()
+        ]
+
 else:
     SAMPLE_IDS = sorted(
         p.name.removesuffix(".zarr")
@@ -98,20 +110,39 @@ def segment_zarr(wildcards):
 
 # ----------------------- Targets ----------------------- #
 
+# Registration parameters
+REGISTRATION = {}
+
+if RUN_BAYSOR:
+    REGISTRATION["baysor"] = {
+        "source_key": "baysor_boundaries",
+        "mask_key": BS_MASK_KEY,
+        "hash": BS_HASH,
+    }
+
+
+TARGETS = []
+
+for method, settings in REGISTRATION.items():
+    TARGETS += expand(
+        str(
+            SEGMENT_DIR /
+            "logs/{sample}_sopaRegister_{method}_{hash}.sentinel"
+        ),
+        sample=SAMPLE_IDS,
+        method=method,
+        hash=settings["hash"],
+    )
+
+if not TARGETS:
+    TARGETS = expand(
+        str(SEGMENT_DIR / "logs/{sample}_sopa_segmentSetup.sentinel"),
+        sample=SAMPLE_IDS,
+    )
+
 rule full:
     input:
-        expand(
-            str(
-                SEGMENT_DIR /
-                f"patches/{{sample}}/baysorResolve_{BS_MASK_KEY}_{BS_HASH}.sentinel"
-            ),
-            sample=SAMPLE_IDS,
-        ) if RUN_BAYSOR else expand(
-            str(SEGMENT_DIR / "logs/{sample}_sopa_segmentSetup.sentinel"),
-            sample=SAMPLE_IDS,
-        )
-    params:
-        lock=LOCK,
+        TARGETS
     resources:
         **RESOURCES,
     shell:
@@ -125,15 +156,14 @@ rule full:
 #RESOURCES["mem_mb"] = config["sdata_mem"] 
 
 rule segment_setup:
-    input:
-        zarr=input_zarr
     output:
         sentinel=touch(
             str(SEGMENT_DIR / "logs/{sample}_sopa_segmentSetup.sentinel")
         )
     params:
+        original_zarr=input_zarr,
         zarr=segment_zarr,
-        mode=config.get("segmentation_mode", "transcripts"),
+        mode="transcripts",
         image=(
             f"--image {shlex.quote(str(config['image_key']))}"
             if config.get("image_key")
@@ -156,7 +186,7 @@ rule segment_setup:
     shell:
         """
         python -m spatialhub.scripts.sopaSegmentSetup \
-            --input-zarr {input.zarr:q} \
+            --input-zarr {params.original_zarr:q} \
             --output-zarr {params.zarr:q} \
             --segmentation-mode {params.mode} \
             {params.image} \
@@ -169,24 +199,18 @@ rule segment_setup:
 
 # ----------------------- Transcripts patching ----------------------- #
 
-#RESOURCES["mem_mb"] = config["bs_mem"]
-#RESOURCES["threads"] = config["bs_cpu"] 
-
 checkpoint sopa_transcripts_patch:
     input:
         str(SEGMENT_DIR / "logs/{sample}_sopa_segmentSetup.sentinel")
     output:
-        sentinel=touch(
-            str(SEGMENT_DIR / "logs/{sample}_sopa_transcriptsPatch.sentinel")
-        ),
         patch_indices=str(
             SEGMENT_DIR / "patches/{sample}_transcripts.indices"
         )
     params:
         zarr=segment_zarr,
-        width=config["tx_patch_width"],
-        overlap=config["tx_patch_ovlp"],
-        prior=config["prior_segment_key"]
+        width=PATCH_WIDTH,
+        overlap=PATCH_OVERLAP,
+        prior=config.get("prior_segment_key")
     resources:
         **RESOURCES,
     log:
@@ -196,8 +220,11 @@ checkpoint sopa_transcripts_patch:
             "sopa", "patchify", "transcripts", params.zarr,
             "--patch-width-microns", str(params.width),
             "--patch-overlap-microns", str(params.overlap),
-            "--prior-shapes-key", str(params.prior),
         ]
+        if params.prior:
+            command.extend([
+                "--prior-shapes-key", str(params.prior)
+            ])
 
         with open(log[0], "w") as handle:
             subprocess.run(
@@ -207,9 +234,8 @@ checkpoint sopa_transcripts_patch:
                 check=True,
             )
 
-        # Retrieve actual patch indices (which may not be consecutive)
+        # Retrieve actual transcript patch indices
         sdata = spd.read_zarr(params.zarr)
-
         patch_indices = sdata["transcripts_patches"].index.tolist()
 
         if not patch_indices:
@@ -218,6 +244,78 @@ checkpoint sopa_transcripts_patch:
         with open(output.patch_indices, "w") as handle:
             handle.write(",".join(map(str, patch_indices)))
 
+
+rule count_patch_transcripts:
+    input:
+        patch_indices=str(
+            SEGMENT_DIR / "patches/{sample}_transcripts.indices"
+        )
+    output:
+        counts=str(
+            SEGMENT_DIR / "patches/{sample}_transcriptCounts.tsv"
+        )
+    log:
+        str(SEGMENT_DIR / "logs/{sample}_countPatchTx.log")
+    params:
+        zarr=segment_zarr,
+    threads: 4
+    resources:
+        **RESOURCES,
+    log:
+        str(SEGMENT_DIR / "logs/{sample}_transcriptCounts.log")
+    shell:
+        """
+        python -m spatialhub.scripts.countPatchTranscripts \
+            --input-zarr {params.zarr:q} \
+            --output {output.counts:q} \
+            --workers {threads} \
+            > {log:q} 2>&1
+        """
+
+
+rule validate_patch_transcripts:
+    input:
+        counts=str(
+            SEGMENT_DIR / "patches/{sample}_transcriptCounts.tsv"
+        )
+    output:
+        validated=str(
+            SEGMENT_DIR / "patches/{sample}_transcriptCounts.validated"
+        )
+    log:
+        str(SEGMENT_DIR / "logs/{sample}_validatePatchTx.log")
+    resources:
+        **RESOURCES,
+    params:
+        minimum=int(config.get("tx_min_transcripts", 4000))
+    run:
+        counts = pd.read_csv(input.counts, sep="\t")
+
+        if counts.empty:
+            raise ValueError("No transcript patch counts found.")
+
+        if counts["n_transcripts"].isna().any():
+            raise ValueError("Missing transcript counts detected.")
+
+        insufficient = counts[
+            counts["n_transcripts"] < params.minimum
+        ]
+
+        if not insufficient.empty:
+            details = ", ".join(
+                f"{row.patch_index} ({row.n_transcripts})"
+                for row in insufficient.itertuples()
+            )
+
+            raise ValueError(
+                f"{len(insufficient)} patches contain fewer than "
+                f"{params.minimum} transcripts: {details}. "
+                "Increase tx_patch_width and regenerate patches."
+            )
+
+        Path(output.validated).write_text(
+            f"All patches contain at least {params.minimum} transcripts.\n"
+        )
 
 
 def transcripts_patch_outputs(wildcards):
@@ -245,7 +343,12 @@ def transcripts_patch_outputs(wildcards):
 
 rule sopa_segment_baysor:
     input:
-        str(SEGMENT_DIR / "logs/{sample}_sopa_transcriptsPatch.sentinel")
+        patch_indices=str(
+            SEGMENT_DIR / "patches/{sample}_transcripts.indices"
+        ),
+        validated=str(
+            SEGMENT_DIR / "patches/{sample}_transcriptCounts.validated"
+        ),
     output:
         sentinel=touch(
             str(SEGMENT_DIR / f"patches/{{sample}}/baysorSegment_{BS_MASK_KEY}_{BS_HASH}_{{patch}}.sentinel")
@@ -253,7 +356,6 @@ rule sopa_segment_baysor:
     params:
         zarr=segment_zarr,
         config=repr(config["bs_config"]),
-        cache=BS_CACHE,
         min_area=config["bs_cell_area"]
     wildcard_constraints:
         patch=r"\d+"
@@ -289,9 +391,8 @@ rule sopa_resolve_baysor:
     params:
         zarr=segment_zarr,
         gene=config["bs_gene_column"],
-        mask_key=BS_MASK_KEY,
     resources:
-        **RESOURCES,
+        **RESOURCES
     log:
         str(
             SEGMENT_DIR /
@@ -299,32 +400,28 @@ rule sopa_resolve_baysor:
         )
     run:
         zarr = Path(params.zarr)
-        source = zarr / "shapes" / "baysor_boundaries"
-        destination = zarr / "shapes" / params.mask_key
+        patch_dir = zarr / ".sopa_cache" / "transcript_patches"
 
-        if source != destination and destination.exists():
-            raise FileExistsError(
-                f"Segmentation already exists: {destination}"
-            )
+        # Normalize Baysor 0.9.0 output locations
+        # (disabled for Baysor v0.7.1)
+        #for patch in patch_dir.iterdir():
+        #    segmentation_dir = patch / "segmentation"
+        #
+        #    if not segmentation_dir.is_dir():
+        #        continue
+        #
+        #    for item in segmentation_dir.iterdir():
+        #        destination = patch / item.name
+        #
+        #        if destination.exists():
+        #            raise FileExistsError(
+        #                f"Destination already exists: {destination}"
+        #            )
+        #
+        #        shutil.move(str(item), str(destination))
+        #
+        #    segmentation_dir.rmdir()
 
-        patch_dir = Path(params.zarr) / ".sopa_cache" / "transcript_patches"
-
-        for patch in patch_dir.iterdir():
-            segmentation_dir = patch / "segmentation"
-
-            if not segmentation_dir.is_dir():
-                continue
-
-            for item in segmentation_dir.iterdir():
-                destination = patch / item.name
-
-                if destination.exists():
-                    raise FileExistsError(f"Destination already exists: {destination}")
-
-                shutil.move(str(item), str(destination))
-
-            segmentation_dir.rmdir()
-        
         command = [
             "sopa", "resolve", "baysor", str(zarr),
             "--gene-column", params.gene,
@@ -338,16 +435,86 @@ rule sopa_resolve_baysor:
                 check=True,
             )
 
-        if not source.exists():
-            raise FileNotFoundError(
-                f"Resolved segmentation not found: {source}"
+        # Verify that SOPA produced the resolved shape.
+        sdata = spd.read_zarr(zarr)
+
+        if "baysor_boundaries" not in sdata.shapes:
+            raise RuntimeError(
+                "Baysor resolution did not produce "
+                "'baysor_boundaries'."
             )
 
-        #if source != destination:
-        #    source.rename(destination)
 
-        with open(log[0], "a") as handle:
-            handle.write(
-                f"\nRegistered segmentation: {destination}\n"
+# ----------------------- Registration to source zarr ----------------------- #
+
+def registration_source(wildcards):
+    method = wildcards.method
+
+    if method not in REGISTRATION:
+        raise ValueError(f"Unknown segmentation method: {method}")
+
+    expected_hash = REGISTRATION[method]["hash"]
+
+    if wildcards.hash != expected_hash:
+        raise ValueError(
+            f"Configuration hash mismatch for {method}: "
+            f"{wildcards.hash} != {expected_hash}"
+        )
+
+    return str(
+        SEGMENT_DIR /
+        f"patches/{wildcards.sample}/"
+        f"{method}Resolve_{REGISTRATION[method]['mask_key']}_{expected_hash}.sentinel"
+    )
+
+
+rule sopa_register_mask:
+    input:
+        sentinel=registration_source
+    output:
+        sentinel=touch(
+            str(
+                SEGMENT_DIR /
+                "logs/{sample}_sopaRegister_{method}_{hash}.sentinel"
             )
+        )
+    params:
+        zarr=segment_zarr,
+        original_zarr=input_zarr,
+        source_key=lambda wc: REGISTRATION[wc.method]["source_key"],
+        mask_key=lambda wc: REGISTRATION[wc.method]["mask_key"],
+        image_key=config.get("image_key", "image"),
+        overwrite=config.get("overwrite_mask", False),
+    wildcard_constraints:
+        method="baysor|proseg",
+        hash=r"[0-9a-f]{12}"
+    resources:
+        **RESOURCES
+    log:
+        str(
+            SEGMENT_DIR /
+            "logs/{sample}_sopaRegister_{method}_{hash}.log"
+        )
+    run:
+        import sys
 
+        command = [
+            sys.executable,
+            "-m", "spatialhub.scripts.sopaRegisterMask",
+            "--input-zarr", params.zarr,
+            "--output-zarr", params.original_zarr,
+            "--source-key", params.source_key,
+            "--mask-key", params.mask_key,
+            "--image-key", params.image_key,
+        ]
+
+        if params.overwrite:
+            command.append("--overwrite")
+
+        with open(log[0], "w") as handle:
+            subprocess.run(
+                command,
+                stdout=handle,
+                stderr=subprocess.STDOUT,
+                check=True,
+            )
