@@ -4,7 +4,7 @@ site_name = "SpatialHub Support Documentation"
 # site_description = "Your project description"
 site_author = "sansomlab"
 
-copyright = 'Copyright : Spatialhub is licensed under a <a rel="noopener" target="_blank" href="https://github.com/sansomlab/spatialhub/blob/main/LICENSE">MIT License</a>'
+copyright = 'SpatialHub is licensed under a <a rel="noopener" target="_blank" href="https://github.com/sansomlab/spatialhub/blob/main/LICENSE">MIT License</a>'
 
 repo_url = "https://github.com/sansomlab/spatialhub"
 repo_name = "sansomlab/spatialhub"
