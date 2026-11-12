@@ -1,0 +1,117 @@
+/* ==========================================================================
+   Classic (Material for MkDocs) admonition styling for the Zensical
+   modern variant.
+
+   The modern variant tints the whole admonition box and removes the
+   border and title band. These rules restore the classic appearance
+   while leaving the rest of the modern theme unchanged.
+
+   Each admonition type sets one variable, --admonition-color, which
+   drives the border, the title band and the focus ring.
+
+   Two levels of specificity are used deliberately:
+
+   - Layout and the white box background use [class] selectors, which
+     are just strong enough to override the modern variant's own rules
+     (for example `.md-typeset .admonition.note`) without !important.
+
+   - Border and title-band colours use :where(), which has almost no
+     specificity. Any type-specific rule written in the Material style,
+     such as `.md-typeset .spinner > .admonition-title`, therefore takes
+     precedence, wherever it appears in the stylesheet.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Type colours (built-in types, matching Zensical's own palette)
+   -------------------------------------------------------------------------- */
+
+.md-typeset .admonition,
+.md-typeset details           { --admonition-color: #448aff; }
+.md-typeset .note             { --admonition-color: #448aff; }
+.md-typeset .abstract         { --admonition-color: #00b0ff; }
+.md-typeset .info             { --admonition-color: #00b8d4; }
+.md-typeset .tip              { --admonition-color: #00bfa5; }
+.md-typeset .success          { --admonition-color: #00c853; }
+.md-typeset .question         { --admonition-color: #64dd17; }
+.md-typeset .warning          { --admonition-color: #ff9100; }
+.md-typeset .failure          { --admonition-color: #ff5252; }
+.md-typeset .danger           { --admonition-color: #ff1744; }
+.md-typeset .bug              { --admonition-color: #f50057; }
+.md-typeset .example          { --admonition-color: #7c4dff; }
+.md-typeset .quote            { --admonition-color: #9e9e9e; }
+
+/* --------------------------------------------------------------------------
+   Box: white background, thin coloured border, small radius, shadow
+   -------------------------------------------------------------------------- */
+
+.md-typeset .admonition[class],
+.md-typeset details[class] {
+  padding: 0 0.6rem;
+  background-color: var(--md-admonition-bg-color);
+  border-width: 0.075rem;
+  border-style: solid;
+  border-radius: 0.2rem;
+  box-shadow: var(--md-shadow-z1);
+  transition: box-shadow 125ms;
+}
+
+/* Border colour: low specificity, so per-type border-color rules win */
+.md-typeset :where(.admonition, details) {
+  border-color: var(--admonition-color);
+}
+
+.md-typeset .admonition[class]:focus-within,
+.md-typeset details[class]:focus-within {
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--admonition-color) 10%, transparent);
+}
+
+.md-typeset details[class]:not([open]) {
+  box-shadow: none;
+}
+
+/* --------------------------------------------------------------------------
+   Title band: full-width tinted strip with the icon inside it
+   -------------------------------------------------------------------------- */
+
+.md-typeset .admonition[class] > .admonition-title,
+.md-typeset details[class] > summary {
+  margin: 0 -0.6rem;
+  padding: 0.4rem 0.6rem 0.4rem 2rem;
+  border: none;
+  border-top-left-radius: 0.1rem;
+}
+
+/* Title-band colour: low specificity, so per-type background rules win */
+.md-typeset :where(.admonition) > :where(.admonition-title),
+.md-typeset :where(details) > :where(summary) {
+  background-color: color-mix(in srgb, var(--admonition-color) 10%, transparent);
+}
+
+/* Collapsible blocks leave room on the right for the expand arrow */
+.md-typeset details[class] > summary {
+  padding-right: 1.8rem;
+}
+
+/* Content after the title starts directly below the band */
+.md-typeset .admonition[class] > .admonition-title + *,
+.md-typeset details[class] > summary + * {
+  margin-top: 0.6rem;
+}
+
+/* A title-only or collapsed block has no space under the band */
+html .md-typeset .admonition[class] > .admonition-title:last-child,
+.md-typeset details[class]:not([open]) > summary {
+  margin-bottom: 0;
+}
+
+/* Icon and expand-arrow positions within the band */
+.md-typeset .admonition[class] > .admonition-title::before,
+.md-typeset details[class] > summary::before {
+  top: 0.625em;
+  left: 0.6rem;
+}
+
+.md-typeset details[class] > summary::after {
+  top: 0.625em;
+  right: 0.4rem;
+}

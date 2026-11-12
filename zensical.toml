@@ -20,6 +20,7 @@ extra_css = [
               "stylesheets/code_block_colour_nord.css",
               "stylesheets/gradient_peek.css",
               "stylesheets/admonitions.css",
+              "stylesheets/admonition_override.css",
 ]
   
 # extra_javascript = ["javascripts/extra.js"]
