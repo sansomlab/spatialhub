@@ -1,4 +1,3 @@
-  GNU nano 7.2                                                                       overview.md                                                                                
 # Overview
 
 `spatialhub` is a collection of modular pipelines for the processing of spatial transcriptomics data, compatible with the [scverse](https://scverse.org/) ecosystem.
