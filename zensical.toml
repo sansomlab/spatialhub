@@ -12,7 +12,8 @@ repo_name = "sansomlab/spatialhub"
 
 nav = [
   { "Get started" = "index.md" },
-  { "Markdown in 5min" = "markdown.md" },
+  { "Overview" = "overview.md" },
+  { "Segmentation"  = "segmentation.md" },
 ]
 
 # extra_css = ["stylesheets/extra.css"]
