@@ -12,6 +12,7 @@ repo_name = "sansomlab/spatialhub"
 
 nav = [
   { "Overview" = "index.md" },
+  { "Installation" = "installation.md"},
   { "Segmentation"  = "segmentation.md" },
 ]
 
