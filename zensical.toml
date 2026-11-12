@@ -1,7 +1,7 @@
 [project]
 site_url = "https://sansomlab.github.io/spatialhub"
 site_name = "SpatialHub Support Documentation"
-# site_description = "Your project description"
+site_description = "Support Documentation for SpatialHub(pipelines for spatial transcriptomics analyses)"
 site_author = "sansomlab"
 
 copyright = 'SpatialHub is licensed under a <a rel="noopener" target="_blank" href="https://github.com/sansomlab/spatialhub/blob/main/LICENSE">MIT License</a>'
