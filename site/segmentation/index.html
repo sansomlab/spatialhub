@@ -59,6 +59,10 @@
     
       <link rel="stylesheet" href="../stylesheets/header.css">
     
+      <link rel="stylesheet" href="../stylesheets/code_block_colour_nord.css">
+    
+      <link rel="stylesheet" href="../stylesheets/gradient_peek.css">
+    
     <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
@@ -513,16 +517,20 @@
 <p>The setup task creates a minimal copy of the original zarr stack, and ensure all elements in this object match expected SOPA conventions. Note that this if you modify your zarr stack upstream, Snakemake will not detect it and not re-run this step by default. To force re-execution of this step, delete the sentinel files it creates.</p>
 <h3 id="stardist">StarDist<a class="headerlink" href="#stardist" title="Permanent link">&para;</a></h3>
 <p>Before running the pipeline, make sure to download the model of choice and noting its path by running the following script in an interactive session (replacing "2D_versatile_fluo" with your StarDist model of choice):</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>from stardist.models import StarDist2D
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>model = StarDist2D.from_pretrained("2D_versatile_fluo")
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>print(model.logdir)
+<div class="nord">
+<div class="language-py highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">stardist.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">StarDist2D</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">model</span> <span class="o">=</span> <span class="n">StarDist2D</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">"2D_versatile_fluo"</span><span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">logdir</span><span class="p">)</span>
 </span></code></pre></div>
+</div>
 <h3 id="registration">Registration<a class="headerlink" href="#registration" title="Permanent link">&para;</a></h3>
 <p>To force image registration to re-run (e.g. after switching maks name overwrote from false to true), delete the corresponding sentinel in <code>sopa.segment.dir/patches/P6/stardistResolve_stardist_fluo_&lt;HASH&gt;.sentinel</code></p>
 <p>If you wish to register an old mask which wasn't the latest created, you must force the re-run of the SOPA patch-resolution first. This can be achieved by removing 2 sentinel files:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rm sopa.image.dir/patches/P6/stardistResolve_stardist_fluo_&lt;HASH&gt;.sentinel
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>rm sopa.image.dir/logs/P6_sopaRegister_stardist_&lt;HASH&gt;.sentinel
+<div class="nord">
+<div class="language-py highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">rm</span> <span class="n">sopa</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">dir</span><span class="o">/</span><span class="n">patches</span><span class="o">/</span><span class="n">P6</span><span class="o">/</span><span class="n">stardistResolve_stardist_fluo_</span><span class="o">&lt;</span><span class="n">HASH</span><span class="o">&gt;.</span><span class="n">sentinel</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">rm</span> <span class="n">sopa</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">dir</span><span class="o">/</span><span class="n">logs</span><span class="o">/</span><span class="n">P6_sopaRegister_stardist_</span><span class="o">&lt;</span><span class="n">HASH</span><span class="o">&gt;.</span><span class="n">sentinel</span>
 </span></code></pre></div>
+</div>
 
 
 
