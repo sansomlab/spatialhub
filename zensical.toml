@@ -16,14 +16,19 @@ nav = [
   { "Segmentation"  = "segmentation.md" },
 ]
 
-# extra_css = ["stylesheets/extra.css"]
+extra_css = [
+              "stylesheets/header.css",
+]
+  
 # extra_javascript = ["javascripts/extra.js"]
 
 [project.theme]
 # variant = "classic"
 # custom_dir = "overrides"
-# favicon = "images/favicon.png"
+favicon = "assets/icons/sansomlab_logo.png"
+logo = "assets/icons/sansomlab_logo.png"
 language = "en"
+
 features = [
   "announce.dismiss",
   # "content.action.edit",
@@ -53,7 +58,7 @@ features = [
   # "toc.integrate",
 ]
 
-# logo = "assets/logo.png"
+
 
 # [project.theme.icon]
 # logo = "lucide/smile"
