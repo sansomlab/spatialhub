@@ -11,7 +11,8 @@ repo_name = "sansomlab/spatialhub"
 # edit_uri = "edit/main/docs/"
 
 nav = [
-  { "Overview" = "index.md" },
+  { "SpatialHub" = "index.md" },
+  { "Overview" = "overview.md" },
   { "Installation" = "installation.md"},
   { "Segmentation"  = "segmentation.md" },
 ]
@@ -22,6 +23,7 @@ extra_css = [
               "stylesheets/gradient_peek.css",
               "stylesheets/admonitions.css",
               "stylesheets/admonition_override.css",
+              "stylesheets/landing.css",
 ]
   
 # extra_javascript = ["javascripts/extra.js"]

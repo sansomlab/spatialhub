@@ -1,0 +1,259 @@
+/* ==========================================================================
+   SpatialHub landing page cards
+
+   Layout: Overview and Installation side by side, with a full-width
+   Pipelines card below that expands to list every pipeline by stage.
+
+   The Pipelines card is a native <details> element, so it needs no
+   JavaScript, works with keyboard navigation and instant loading, and
+   its links remain in the page for search.
+
+   Selectors are prefixed with .sh-grid so that they outrank the
+   admonition rules, which also target <details>.
+   ========================================================================== */
+
+.md-typeset .sh-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin: 1.6rem 0;
+}
+
+/* --------------------------------------------------------------------------
+   Card base
+   -------------------------------------------------------------------------- */
+
+.md-typeset .sh-grid .sh-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 1rem 1.2rem;
+  font-size: 0.7rem;
+  color: var(--md-default-fg-color);
+  background-color: var(--md-default-bg-color);
+  border: 0.05rem solid var(--md-default-fg-color--lightest);
+  border-radius: 0.4rem;
+  box-shadow: none;
+  transition: border-color 150ms, box-shadow 150ms, transform 150ms;
+}
+
+.md-typeset .sh-grid .sh-card:hover,
+.md-typeset .sh-grid .sh-card:focus-within {
+  border-color: var(--md-accent-fg-color);
+  box-shadow: var(--md-shadow-z2);
+}
+
+.md-typeset .sh-grid .sh-card > :first-child { margin-top: 0; }
+.md-typeset .sh-grid .sh-card > :last-child  { margin-bottom: 0; }
+
+.md-typeset .sh-grid .sh-card p {
+  margin: 0.5em 0;
+}
+
+/* Card icon: the theme sizes icons through --md-icon-size */
+.md-typeset .sh-grid .twemoji.sh-icon {
+  --md-icon-size: 1.5rem;
+  color: var(--md-primary-fg-color);
+}
+
+.md-typeset .sh-grid .sh-title,
+.md-typeset .sh-grid .sh-title strong {
+  display: block;
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--md-default-fg-color);
+}
+
+/* No underlines inside cards; hover colour is the cue instead */
+.md-typeset .sh-grid a {
+  text-decoration: none;
+}
+
+/* --------------------------------------------------------------------------
+   Link cards: the whole card is clickable through the single link inside
+   -------------------------------------------------------------------------- */
+
+/* Keep the link at the bottom so cards of unequal text length align */
+.md-typeset .sh-grid .sh-card > p:has(> .sh-link) {
+  margin-top: auto;
+  padding-top: 0.4rem;
+}
+
+.md-typeset .sh-grid .sh-link {
+  font-weight: 700;
+}
+
+.md-typeset .sh-grid .sh-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.md-typeset .sh-grid .sh-link .twemoji svg {
+  transition: transform 150ms;
+}
+
+.md-typeset .sh-grid .sh-card:hover .sh-link .twemoji svg {
+  transform: translateX(0.2rem);
+}
+
+/* --------------------------------------------------------------------------
+   Pipelines card: full width, expandable
+   -------------------------------------------------------------------------- */
+
+.md-typeset .sh-grid details.sh-pipelines {
+  grid-column: 1 / -1;
+  display: block;
+  overflow: visible;
+}
+
+/* Reset the admonition styling that the theme applies to every summary */
+.md-typeset .sh-grid details.sh-pipelines > summary {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 1rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  font-weight: 400;
+  background: none;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.md-typeset .sh-grid details.sh-pipelines > summary::before,
+.md-typeset .sh-grid details.sh-pipelines > summary::after {
+  content: none;
+  display: none;
+}
+
+.md-typeset .sh-grid details.sh-pipelines > summary::-webkit-details-marker {
+  display: none;
+}
+
+.md-typeset .sh-grid details.sh-pipelines > summary .sh-title {
+  margin: 0;
+}
+
+.md-typeset .sh-grid .sh-summary-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.md-typeset .sh-grid .sh-meta {
+  color: var(--md-default-fg-color--light);
+}
+
+/* "Show pipelines" / "Hide pipelines" toggle with rotating chevron */
+.md-typeset .sh-grid .sh-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 700;
+  color: var(--md-typeset-a-color);
+  white-space: nowrap;
+}
+
+.md-typeset .sh-grid .sh-toggle-label::before {
+  content: "Show pipelines";
+}
+
+.md-typeset .sh-grid details.sh-pipelines[open] .sh-toggle-label::before {
+  content: "Hide pipelines";
+}
+
+.md-typeset .sh-grid .sh-toggle .twemoji svg {
+  transition: transform 200ms;
+}
+
+.md-typeset .sh-grid details.sh-pipelines[open] .sh-toggle .twemoji svg {
+  transform: rotate(180deg);
+}
+
+.md-typeset .sh-grid details.sh-pipelines > summary:focus-visible {
+  outline: 0.1rem solid var(--md-accent-fg-color);
+  outline-offset: 0.4rem;
+  border-radius: 0.2rem;
+}
+
+/* --------------------------------------------------------------------------
+   Expanded content: pipelines grouped by stage
+   -------------------------------------------------------------------------- */
+
+.md-typeset .sh-grid .sh-stages {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1.2rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 0.05rem solid var(--md-default-fg-color--lightest);
+}
+
+.md-typeset .sh-grid .sh-stage-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .sh-grid .sh-stage ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.md-typeset .sh-grid .sh-stage li {
+  margin: 0 0 0.7rem;
+  padding: 0;
+  line-height: 1.45;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .sh-grid .sh-stage li:last-child {
+  margin-bottom: 0;
+}
+
+/* Pipeline name on its own line, description beneath */
+.md-typeset .sh-grid .sh-stage li > a {
+  display: block;
+  width: fit-content;
+}
+
+.md-typeset .sh-grid .sh-stage li > a code {
+  font-weight: 700;
+  color: var(--md-typeset-a-color);
+  background-color: var(--md-code-bg-color);
+}
+
+.md-typeset .sh-grid .sh-stage li > a:hover code {
+  color: var(--md-accent-fg-color);
+}
+
+/* --------------------------------------------------------------------------
+   Narrow screens: single column
+   -------------------------------------------------------------------------- */
+
+@media screen and (max-width: 44.984375em) {
+  .md-typeset .sh-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .md-typeset .sh-grid details.sh-pipelines > summary {
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    row-gap: 0.6rem;
+  }
+
+  .md-typeset .sh-grid .sh-toggle {
+    grid-column: 2;
+  }
+}
