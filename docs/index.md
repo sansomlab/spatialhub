@@ -59,11 +59,11 @@ Installing SpatialHub on the BMRC cluster, configuring the environment and verif
 **Build SpatialData objects**
 { .sh-stage-title }
 
-- [`cosmx_makeZarr`](pipelines/cosmx_makeZarr.md)
+- [`cosmx_makeZarr`](pipelines.md#cosmx_makezarr)
   One Zarr store per CosMx sample, with or without Ashlar stitching
-- [`visiumhd_makeZarr`](pipelines/visiumhd_makeZarr.md)
+- [`visiumhd_makeZarr`](pipelines.md#visiumhd_makezarr)
   One Zarr store per Visium HD capture area, via Space Ranger count
-- [`visiumhd_prepareBin2Cell`](pipelines/visiumhd_prepareBin2Cell.md)
+- [`visiumhd_prepareBin2Cell`](pipelines.md#visiumhd_preparebin2cell)
   Bin2Cell intermediate files up to the StarDist step
 
 </div>
@@ -73,9 +73,9 @@ Installing SpatialHub on the BMRC cluster, configuring the environment and verif
 **Create AnnData objects**
 { .sh-stage-title }
 
-- [`extractH5AD`](pipelines/extractH5AD.md)
+- [`extractH5AD`](pipelines.md#extracth5ad-aggregateh5ad)
   Extract an existing table to H5AD, typically for Visium HD
-- [`aggregateH5AD`](pipelines/aggregateH5AD.md)
+- [`aggregateH5AD`](pipelines.md#extracth5ad-aggregateh5ad)
   Aggregate points and shapes into H5AD, typically for CosMx
 
 </div>
@@ -85,9 +85,9 @@ Installing SpatialHub on the BMRC cluster, configuring the environment and verif
 **Cell-type deconvolution**
 { .sh-stage-title }
 
-- [`runRCTD`](pipelines/runRCTD.md)
+- [`runRCTD`](pipelines.md#runrctd-runcell2location)
   Deconvolution with RCTD against a single-cell reference
-- [`runCell2Location`](pipelines/runCell2Location.md)
+- [`runCell2Location`](pipelines.md#runrctd-runcell2location)
   Deconvolution with Cell2Location against a single-cell reference
 
 </div>
