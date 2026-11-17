@@ -223,7 +223,7 @@ rule segment_setup:
     params:
         original_zarr=input_zarr,
         zarr=segment_zarr,
-        mode=config.get("segmentation_mode", "image"),
+        mode="image",
         image=(
             f"--image {shlex.quote(str(config['image_key']))}"
             if config.get("image_key")

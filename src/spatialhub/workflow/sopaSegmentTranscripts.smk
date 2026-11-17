@@ -1,6 +1,6 @@
 
 """
-Transcripts-based cell segmentation using SOPA (baysor/proseg).
+Transcripts-based cell segmentation using SOPA (Baysor).
 
 Input:
     Existing SpatialData Zarr stores.
@@ -12,18 +12,13 @@ Output:
 Stages:
     1. Create reduced segmentation Zarr.
     2. Generate SOPA transcripts patches.
-    3. Run Baysor and/or Proseg segmentation per patch.
+    3. Run Baysor segmentation per patch.
     4. Resolve segmentation boundaries (using SOPA).
     4. Register segmentation mask (shapes) to original Zarr store.
-
-NOTE (beta):
-    Do not run Baysor and Proseg simultaneously on the same
-    SpatialData Zarr. Concurrent writes are not yet protected.
 """
 
 from pathlib import Path
 import shlex
-import shutil
 import subprocess
 import hashlib
 import json
@@ -41,59 +36,27 @@ RESOURCES.update(config.get("resources", {}))
 ZARR_DIR = Path(config["zarr_dir"])
 SEGMENT_DIR = Path(config.get("segment_dir", "sopa.segment.dir"))
 
-RUN_BAYSOR = config.get("run_baysor", False)
-RUN_PROSEG = config.get("run_proseg", False)
-
-# For beta release only!
-if RUN_BAYSOR and RUN_PROSEG:
-    raise ValueError(
-        "Running Baysor and Proseg together is not supported "
-        "in the beta release. Enable only one method."
-    )
-
-# Shared image patching parameters
+# Transcripts patching parameters
 PATCH_WIDTH = config["tx_patch_width"]
 PATCH_OVERLAP = config["tx_patch_ovlp"]
 
 
 # ----------------------- Baysor configuration ----------------------- #
 
-if RUN_BAYSOR:
+BS_CONFIG = config["bs_config"]
+BS_MASK_KEY = config["bs_mask_key"]
 
-    BS_CONFIG = config["bs_config"]
-    BS_MASK_KEY = config["bs_mask_key"]
+BS_PARAMS = {
+    "patch_width": PATCH_WIDTH,
+    "patch_overlap": PATCH_OVERLAP,
+    "baysor_config": BS_CONFIG,
+    "baysor_area": config["bs_cell_area"],
+    "mask_key": config["bs_mask_key"],
+}
 
-    BS_PARAMS = {
-        "patch_width": PATCH_WIDTH,
-        "patch_overlap": PATCH_OVERLAP,
-        "baysor_config": BS_CONFIG,
-        "baysor_area": config["bs_cell_area"],
-        "mask_key": config["bs_mask_key"],
-    }
-
-    BS_HASH = hashlib.sha256(
-        json.dumps(BS_PARAMS, sort_keys=True).encode()
-    ).hexdigest()[:12]
-
-
-# ----------------------- Proseg configuration ----------------------- #
-
-if RUN_PROSEG:
-
-    PS_CONFIG = config["ps_config"]
-    PS_MASK_KEY = config["ps_mask_key"]
-
-    PS_PARAMS = {
-        "patch_width": PATCH_WIDTH,
-        "patch_overlap": PATCH_OVERLAP,
-        "proseg_config": PS_CONFIG,
-        "proseg_area": config["ps_cell_area"],
-        "mask_key": config["ps_mask_key"],
-    }
-
-    PS_HASH = hashlib.sha256(
-        json.dumps(PS_PARAMS, sort_keys=True).encode()
-    ).hexdigest()[:12]
+BS_HASH = hashlib.sha256(
+    json.dumps(BS_PARAMS, sort_keys=True).encode()
+).hexdigest()[:12]
 
 
 # ----------------------- Sample selection ----------------------- #
@@ -141,46 +104,15 @@ def segment_zarr(wildcards):
 
 # ----------------------- Targets ----------------------- #
 
-# Registration parameters
-REGISTRATION = {}
-
-if RUN_BAYSOR:
-    REGISTRATION["baysor"] = {
-        "source_key": "baysor_boundaries",
-        "mask_key": BS_MASK_KEY,
-        "hash": BS_HASH,
-    }
-
-if RUN_PROSEG:
-    REGISTRATION["proseg"] = {
-        "source_key": "proseg_boundaries",
-        "mask_key": PS_MASK_KEY,
-        "hash": PS_HASH,
-    }
-
-
-TARGETS = []
-
-for method, settings in REGISTRATION.items():
-    TARGETS += expand(
-        str(
-            SEGMENT_DIR /
-            "logs/{sample}_sopaRegister_{method}_{hash}.sentinel"
-        ),
-        sample=SAMPLE_IDS,
-        method=method,
-        hash=settings["hash"],
-    )
-
-if not TARGETS:
-    TARGETS = expand(
-        str(SEGMENT_DIR / "logs/{sample}_sopa_segmentSetup.sentinel"),
-        sample=SAMPLE_IDS,
-    )
-
 rule full:
     input:
-        TARGETS
+        expand(
+            str(
+                SEGMENT_DIR /
+                f"logs/{{sample}}_sopaRegister_baysor_{BS_HASH}.sentinel"
+            ),
+            sample=SAMPLE_IDS,
+        )
     resources:
         **RESOURCES,
     shell:
@@ -199,7 +131,7 @@ rule segment_setup:
     params:
         original_zarr=input_zarr,
         zarr=segment_zarr,
-        mode=config.get("segmentation_mode", "transcripts"),,
+        mode="transcripts",
         image=(
             f"--image {shlex.quote(str(config['image_key']))}"
             if config.get("image_key")
@@ -281,6 +213,8 @@ checkpoint sopa_transcripts_patch:
             handle.write(",".join(map(str, patch_indices)))
 
 
+# ----------------------- Patch validation ----------------------- #
+
 rule count_patch_transcripts:
     input:
         patch_indices=str(
@@ -290,8 +224,6 @@ rule count_patch_transcripts:
         counts=str(
             SEGMENT_DIR / "patches/{sample}_transcriptCounts.tsv"
         )
-    log:
-        str(SEGMENT_DIR / "logs/{sample}_countPatchTx.log")
     params:
         zarr=segment_zarr,
     threads: 4
@@ -313,6 +245,9 @@ rule validate_patch_transcripts:
     input:
         counts=str(
             SEGMENT_DIR / "patches/{sample}_transcriptCounts.tsv"
+        ),
+        patch_indices=str(
+            SEGMENT_DIR / "patches/{sample}_transcripts.indices"
         )
     output:
         validated=str(
@@ -327,12 +262,28 @@ rule validate_patch_transcripts:
     run:
         counts = pd.read_csv(input.counts, sep="\t")
 
+        # Check whether the table exists and contains the expected data
         if counts.empty:
             raise ValueError("No transcript patch counts found.")
 
         if counts["n_transcripts"].isna().any():
             raise ValueError("Missing transcript counts detected.")
 
+        expected = {
+            int(p)
+            for p in Path(input.patch_indices).read_text().strip().split(",")
+        }
+        observed = counts["patch_index"]
+
+        if observed.isna().any() or observed.duplicated().any():
+            raise ValueError("Invalid or duplicate patch indices in count table.")
+
+        if set(observed.astype(int)) != expected:
+            raise ValueError(
+                "Transcript count table does not match SOPA patch indices."
+            )
+
+        # Check whether all patches have enough transcripts
         insufficient = counts[
             counts["n_transcripts"] < params.minimum
         ]
@@ -367,28 +318,15 @@ def get_patch_indices(wildcards):
     return patch_indices
 
 
-if RUN_BAYSOR:
-    def baysor_patch_outputs(wildcards):
-        return expand(
-            str(
-                SEGMENT_DIR /
-                f"patches/{{sample}}/baysorSegment_{BS_MASK_KEY}_{BS_HASH}_{{patch}}.sentinel"
-            ),
-            sample=wildcards.sample,
-            patch=get_patch_indices(wildcards),
-        )
-
-
-if RUN_PROSEG:
-    def proseg_patch_outputs(wildcards):
-        return expand(
-            str(
-                SEGMENT_DIR /
-                f"patches/{{sample}}/prosegSegment_{PS_MASK_KEY}_{PS_HASH}_{{patch}}.sentinel"
-            ),
-            sample=wildcards.sample,
-            patch=get_patch_indices(wildcards),
-        )
+def baysor_patch_outputs(wildcards):
+    return expand(
+        str(
+            SEGMENT_DIR /
+            f"patches/{{sample}}/baysorSegment_{BS_MASK_KEY}_{BS_HASH}_{{patch}}.sentinel"
+        ),
+        sample=wildcards.sample,
+        patch=get_patch_indices(wildcards),
+    )
 
 
 # ----------------------- Baysor segmentation ----------------------- #
@@ -430,45 +368,6 @@ rule sopa_segment_baysor:
         """
 
 
-# ----------------------- Proseg segmentation ----------------------- #
-
-rule sopa_segment_proseg:
-    input:
-        patch_indices=str(
-            SEGMENT_DIR / "patches/{sample}_transcripts.indices"
-        ),
-        validated=str(
-            SEGMENT_DIR / "patches/{sample}_transcriptCounts.validated"
-        ),
-    output:
-        sentinel=touch(
-            str(SEGMENT_DIR / f"patches/{{sample}}/prosegSegment_{PS_MASK_KEY}_{PS_HASH}_{{patch}}.sentinel")
-        )
-    params:
-        zarr=segment_zarr,
-        config=repr(config["ps_config"]),
-        min_area=config["ps_cell_area"]
-    wildcard_constraints:
-        patch=r"\d+"
-    resources:
-        **RESOURCES,
-    log:
-        str(
-            SEGMENT_DIR /
-            f"logs/{{sample}}_sopaSegment_{PS_MASK_KEY}_{PS_HASH}_{{patch}}.log"
-        )
-    shell:
-        """
-        unset LD_LIBRARY_PATH
-        
-        sopa segmentation proseg {params.zarr:q} \
-            --config {params.config:q} \
-            --patch-index {wildcards.patch} \
-            --min-area {params.min_area} \
-            > {log:q} 2>&1
-        """
-
-
 # ----------------------- Baysor resolution ----------------------- #
 
 rule sopa_resolve_baysor:
@@ -493,27 +392,6 @@ rule sopa_resolve_baysor:
         )
     run:
         zarr = Path(params.zarr)
-        patch_dir = zarr / ".sopa_cache" / "transcript_patches"
-
-        # Normalize Baysor 0.9.0 output locations
-        # (disabled for Baysor v0.7.1)
-        #for patch in patch_dir.iterdir():
-        #    segmentation_dir = patch / "segmentation"
-        #
-        #    if not segmentation_dir.is_dir():
-        #        continue
-        #
-        #    for item in segmentation_dir.iterdir():
-        #        destination = patch / item.name
-        #
-        #        if destination.exists():
-        #            raise FileExistsError(
-        #                f"Destination already exists: {destination}"
-        #            )
-        #
-        #        shutil.move(str(item), str(destination))
-        #
-        #    segmentation_dir.rmdir()
 
         command = [
             "sopa", "resolve", "baysor", str(zarr),
@@ -540,53 +418,32 @@ rule sopa_resolve_baysor:
 
 # ----------------------- Registration to source zarr ----------------------- #
 
-def registration_source(wildcards):
-    method = wildcards.method
-
-    if method not in REGISTRATION:
-        raise ValueError(f"Unknown segmentation method: {method}")
-
-    expected_hash = REGISTRATION[method]["hash"]
-
-    if wildcards.hash != expected_hash:
-        raise ValueError(
-            f"Configuration hash mismatch for {method}: "
-            f"{wildcards.hash} != {expected_hash}"
-        )
-
-    return str(
-        SEGMENT_DIR /
-        f"patches/{wildcards.sample}/"
-        f"{method}Resolve_{REGISTRATION[method]['mask_key']}_{expected_hash}.sentinel"
-    )
-
-
 rule sopa_register_mask:
     input:
-        sentinel=registration_source
+        sentinel=str(
+            SEGMENT_DIR /
+            f"patches/{{sample}}/baysorResolve_{BS_MASK_KEY}_{BS_HASH}.sentinel"
+        )
     output:
         sentinel=touch(
             str(
                 SEGMENT_DIR /
-                "logs/{sample}_sopaRegister_{method}_{hash}.sentinel"
+                f"logs/{{sample}}_sopaRegister_baysor_{BS_HASH}.sentinel"
             )
         )
     params:
         zarr=segment_zarr,
         original_zarr=input_zarr,
-        source_key=lambda wc: REGISTRATION[wc.method]["source_key"],
-        mask_key=lambda wc: REGISTRATION[wc.method]["mask_key"],
+        source_key="baysor_boundaries",
+        mask_key=BS_MASK_KEY,
         image_key=config.get("image_key", "image"),
         overwrite=config.get("overwrite_mask", False),
-    wildcard_constraints:
-        method="baysor|proseg",
-        hash=r"[0-9a-f]{12}"
     resources:
         **RESOURCES
     log:
         str(
             SEGMENT_DIR /
-            "logs/{sample}_sopaRegister_{method}_{hash}.log"
+            f"logs/{{sample}}_sopaRegister_baysor_{BS_HASH}.log"
         )
     run:
         import sys

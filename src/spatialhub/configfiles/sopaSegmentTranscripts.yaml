@@ -29,11 +29,6 @@ tx_patch_ovlp: 200
 tx_min_transcripts: 5000  # minimum transcripts per patch to enable downstream segmentation
     # e.g. SOPA/baysor fails if there are <4000 transcripts in one patch (4000 set by SOPA developers)
 
-# Segmentation
-# only one at a time supported in beta release (zarr lock issues to be resolved)
-run_baysor: true
-run_proseg: true
-
 # Baysor
 bs_config:
     data:
@@ -59,9 +54,5 @@ bs_config:
 bs_cell_area: 100
 bs_gene_column: "target"
 
-# Proseg
-
-
 # Segmentation shape key
 bs_mask_key: "baysor"
-ps_mask_key: "proseg"
