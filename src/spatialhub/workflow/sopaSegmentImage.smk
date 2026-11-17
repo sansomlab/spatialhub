@@ -7,12 +7,14 @@ Input:
 
 Output:
     Reduced SpatialData Zarr stores containing segmentation results.
+    => segmentation mask registered back to original Zarr store
 
 Stages:
     1. Create reduced segmentation Zarr.
     2. Generate SOPA image patches.
     3. Run Cellpose and/or StarDist segmentation per patch.
-    4. Resolve segmentation boundaries.
+    4. Resolve segmentation boundaries (using SOPA).
+    5. Register segmentation mask (shapes) to original Zarr store.
 
 NOTE (beta):
     Do not run Cellpose and StarDist simultaneously on the same
@@ -245,7 +247,7 @@ rule segment_setup:
         """
 
 
-# ----------------------- Cellpose patching ----------------------- #
+# ----------------------- Image patching ----------------------- #
 
 checkpoint sopa_image_patch:
     input:
@@ -254,8 +256,8 @@ checkpoint sopa_image_patch:
         patch_count=str(SEGMENT_DIR / "patches/{sample}_image.count")
     params:
         zarr=segment_zarr,
-        width=config["img_patch_width"],
-        overlap=config["img_patch_ovlp"],
+        width=PATCH_WIDTH,
+        overlap=PATCH_OVERLAP,
     resources:
         **RESOURCES,
     log:

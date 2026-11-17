@@ -7,12 +7,18 @@ Input:
 
 Output:
     Reduced SpatialData Zarr stores containing segmentation results.
+    => segmentation mask registered back to original Zarr store
 
 Stages:
     1. Create reduced segmentation Zarr.
     2. Generate SOPA transcripts patches.
-    3. Run baysor and/or proseg segmentation.
-    4. Register segmentation boundaries.
+    3. Run Baysor and/or Proseg segmentation per patch.
+    4. Resolve segmentation boundaries (using SOPA).
+    4. Register segmentation mask (shapes) to original Zarr store.
+
+NOTE (beta):
+    Do not run Baysor and Proseg simultaneously on the same
+    SpatialData Zarr. Concurrent writes are not yet protected.
 """
 
 from pathlib import Path
@@ -25,7 +31,7 @@ import spatialdata as spd
 import pandas as pd
 
 
-# ----------------------- Configuration ----------------------- #
+# ----------------------- Global configuration ----------------------- #
 
 configfile: "sopaSegmentTranscripts.yaml"
 
@@ -49,19 +55,45 @@ if RUN_BAYSOR and RUN_PROSEG:
 PATCH_WIDTH = config["tx_patch_width"]
 PATCH_OVERLAP = config["tx_patch_ovlp"]
 
-BS_PARAMS = {
-    "patch_width": PATCH_WIDTH,
-    "patch_overlap": PATCH_OVERLAP,
-    "baysor_config": config["bs_config"],
-    "baysor_area": config["bs_cell_area"],
-    "mask_key": config["bs_mask_key"],
-}
 
-BS_HASH = hashlib.sha256(
-    json.dumps(BS_PARAMS, sort_keys=True).encode()
-).hexdigest()[:12]
+# ----------------------- Baysor configuration ----------------------- #
 
-BS_MASK_KEY = config["bs_mask_key"]
+if RUN_BAYSOR:
+
+    BS_CONFIG = config["bs_config"]
+    BS_MASK_KEY = config["bs_mask_key"]
+
+    BS_PARAMS = {
+        "patch_width": PATCH_WIDTH,
+        "patch_overlap": PATCH_OVERLAP,
+        "baysor_config": BS_CONFIG,
+        "baysor_area": config["bs_cell_area"],
+        "mask_key": config["bs_mask_key"],
+    }
+
+    BS_HASH = hashlib.sha256(
+        json.dumps(BS_PARAMS, sort_keys=True).encode()
+    ).hexdigest()[:12]
+
+
+# ----------------------- Proseg configuration ----------------------- #
+
+if RUN_PROSEG:
+
+    PS_CONFIG = config["ps_config"]
+    PS_MASK_KEY = config["ps_mask_key"]
+
+    PS_PARAMS = {
+        "patch_width": PATCH_WIDTH,
+        "patch_overlap": PATCH_OVERLAP,
+        "proseg_config": PS_CONFIG,
+        "proseg_area": config["ps_cell_area"],
+        "mask_key": config["ps_mask_key"],
+    }
+
+    PS_HASH = hashlib.sha256(
+        json.dumps(PS_PARAMS, sort_keys=True).encode()
+    ).hexdigest()[:12]
 
 
 # ----------------------- Sample selection ----------------------- #
@@ -103,7 +135,6 @@ if len(SAMPLE_IDS) != len(set(SAMPLE_IDS)):
 def input_zarr(wildcards):
     return str(ZARR_DIR / f"{wildcards.sample}.zarr")
 
-
 def segment_zarr(wildcards):
     return str(SEGMENT_DIR / f"{wildcards.sample}.zarr")
 
@@ -118,6 +149,13 @@ if RUN_BAYSOR:
         "source_key": "baysor_boundaries",
         "mask_key": BS_MASK_KEY,
         "hash": BS_HASH,
+    }
+
+if RUN_PROSEG:
+    REGISTRATION["proseg"] = {
+        "source_key": "proseg_boundaries",
+        "mask_key": PS_MASK_KEY,
+        "hash": PS_HASH,
     }
 
 
@@ -153,8 +191,6 @@ rule full:
 
 # ----------------------- Segmentation setup ----------------------- #
 
-#RESOURCES["mem_mb"] = config["sdata_mem"] 
-
 rule segment_setup:
     output:
         sentinel=touch(
@@ -163,7 +199,7 @@ rule segment_setup:
     params:
         original_zarr=input_zarr,
         zarr=segment_zarr,
-        mode="transcripts",
+        mode=config.get("segmentation_mode", "transcripts"),,
         image=(
             f"--image {shlex.quote(str(config['image_key']))}"
             if config.get("image_key")
@@ -318,8 +354,7 @@ rule validate_patch_transcripts:
         )
 
 
-def transcripts_patch_outputs(wildcards):
-
+def get_patch_indices(wildcards):
     ckpt = checkpoints.sopa_transcripts_patch.get(
         sample=wildcards.sample
     )
@@ -329,14 +364,31 @@ def transcripts_patch_outputs(wildcards):
             int(p) for p in handle.read().strip().split(",")
         ]
 
-    return expand(
-        str(
-            SEGMENT_DIR /
-            f"patches/{{sample}}/baysorSegment_{BS_MASK_KEY}_{BS_HASH}_{{patch}}.sentinel"
-        ),
-        sample=wildcards.sample,
-        patch=patch_indices,
-    )
+    return patch_indices
+
+
+if RUN_BAYSOR:
+    def baysor_patch_outputs(wildcards):
+        return expand(
+            str(
+                SEGMENT_DIR /
+                f"patches/{{sample}}/baysorSegment_{BS_MASK_KEY}_{BS_HASH}_{{patch}}.sentinel"
+            ),
+            sample=wildcards.sample,
+            patch=get_patch_indices(wildcards),
+        )
+
+
+if RUN_PROSEG:
+    def proseg_patch_outputs(wildcards):
+        return expand(
+            str(
+                SEGMENT_DIR /
+                f"patches/{{sample}}/prosegSegment_{PS_MASK_KEY}_{PS_HASH}_{{patch}}.sentinel"
+            ),
+            sample=wildcards.sample,
+            patch=get_patch_indices(wildcards),
+        )
 
 
 # ----------------------- Baysor segmentation ----------------------- #
@@ -378,9 +430,50 @@ rule sopa_segment_baysor:
         """
 
 
+# ----------------------- Proseg segmentation ----------------------- #
+
+rule sopa_segment_proseg:
+    input:
+        patch_indices=str(
+            SEGMENT_DIR / "patches/{sample}_transcripts.indices"
+        ),
+        validated=str(
+            SEGMENT_DIR / "patches/{sample}_transcriptCounts.validated"
+        ),
+    output:
+        sentinel=touch(
+            str(SEGMENT_DIR / f"patches/{{sample}}/prosegSegment_{PS_MASK_KEY}_{PS_HASH}_{{patch}}.sentinel")
+        )
+    params:
+        zarr=segment_zarr,
+        config=repr(config["ps_config"]),
+        min_area=config["ps_cell_area"]
+    wildcard_constraints:
+        patch=r"\d+"
+    resources:
+        **RESOURCES,
+    log:
+        str(
+            SEGMENT_DIR /
+            f"logs/{{sample}}_sopaSegment_{PS_MASK_KEY}_{PS_HASH}_{{patch}}.log"
+        )
+    shell:
+        """
+        unset LD_LIBRARY_PATH
+        
+        sopa segmentation proseg {params.zarr:q} \
+            --config {params.config:q} \
+            --patch-index {wildcards.patch} \
+            --min-area {params.min_area} \
+            > {log:q} 2>&1
+        """
+
+
+# ----------------------- Baysor resolution ----------------------- #
+
 rule sopa_resolve_baysor:
     input:
-        transcripts_patch_outputs
+        baysor_patch_outputs
     output:
         sentinel=touch(
             str(
