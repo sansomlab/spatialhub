@@ -14,16 +14,18 @@ Stages:
     2. Generate SOPA transcripts patches.
     3. Run Baysor segmentation per patch.
     4. Resolve segmentation boundaries (using SOPA).
-    4. Register segmentation mask (shapes) to original Zarr store.
+    5. Register segmentation mask (shapes) to original Zarr store.
 """
 
 from pathlib import Path
-import shlex
-import subprocess
 import hashlib
 import json
-import spatialdata as spd
+import shlex
+import subprocess
+import sys
+
 import pandas as pd
+import spatialdata as spd
 
 
 # ----------------------- Global configuration ----------------------- #
@@ -49,6 +51,7 @@ BS_MASK_KEY = config["bs_mask_key"]
 BS_PARAMS = {
     "patch_width": PATCH_WIDTH,
     "patch_overlap": PATCH_OVERLAP,
+    "prior": config.get("prior_segment_key"),
     "baysor_config": BS_CONFIG,
     "baysor_area": config["bs_cell_area"],
     "mask_key": config["bs_mask_key"],
@@ -253,8 +256,6 @@ rule validate_patch_transcripts:
         validated=str(
             SEGMENT_DIR / "patches/{sample}_transcriptCounts.validated"
         )
-    log:
-        str(SEGMENT_DIR / "logs/{sample}_validatePatchTx.log")
     resources:
         **RESOURCES,
     params:
@@ -331,14 +332,25 @@ def baysor_patch_outputs(wildcards):
 
 # ----------------------- Baysor segmentation ----------------------- #
 
-rule sopa_segment_baysor:
+# Track BS_HASH configuration to prevent later resolution with mixed patches
+rule track_baysor:
     input:
-        patch_indices=str(
-            SEGMENT_DIR / "patches/{sample}_transcripts.indices"
-        ),
         validated=str(
             SEGMENT_DIR / "patches/{sample}_transcriptCounts.validated"
         ),
+    output:
+        current=str(SEGMENT_DIR / "patches/{sample}_baysor_current.json")
+    params:
+        hash=BS_HASH
+    resources:
+        **RESOURCES
+    run:
+        Path(output.current).write_text(json.dumps({"hash": params.hash}) + "\n")
+
+
+rule sopa_segment_baysor:
+    input:
+        current=str(SEGMENT_DIR / "patches/{sample}_baysor_current.json")
     output:
         sentinel=touch(
             str(SEGMENT_DIR / f"patches/{{sample}}/baysorSegment_{BS_MASK_KEY}_{BS_HASH}_{{patch}}.sentinel")
@@ -346,7 +358,13 @@ rule sopa_segment_baysor:
     params:
         zarr=segment_zarr,
         config=repr(config["bs_config"]),
-        min_area=config["bs_cell_area"]
+        min_area=config["bs_cell_area"],
+        patch_dir=lambda wc: (
+            Path(segment_zarr(wc))
+            / ".sopa_cache"
+            / "transcript_patches"
+            / wc.patch
+        ),
     wildcard_constraints:
         patch=r"\d+"
     resources:
@@ -358,21 +376,53 @@ rule sopa_segment_baysor:
         )
     shell:
         """
+        : > {log:q}
+
+        for file in {params.patch_dir:q}/segmentation* {params.patch_dir:q}/config.toml; do
+            if [ -f "$file" ]; then
+                echo "WARNING: Removing existing Baysor output: $file" \
+                    | tee -a {log:q} >&2
+                rm -- "$file"
+            fi
+        done
+
         unset LD_LIBRARY_PATH
-        
+
         sopa segmentation baysor {params.zarr:q} \
             --config {params.config:q} \
             --patch-index {wildcards.patch} \
             --min-area {params.min_area} \
-            > {log:q} 2>&1
+            >> {log:q} 2>&1
         """
+
+
+def check_owner(path):
+    actual = json.loads(Path(path).read_text()).get("hash")
+    if actual != BS_HASH:
+        raise RuntimeError(
+            f"Baysor patch cache belongs to {actual}, not {BS_HASH}. "
+            "Rerun segmentation with the intended configuration."
+        )
+
+rule record_completion:
+    input:
+        patches=baysor_patch_outputs,
+        current=str(SEGMENT_DIR / "patches/{sample}_baysor_current.json")
+    output:
+        completed=str(SEGMENT_DIR / f"patches/{{sample}}/baysorComplete_{BS_HASH}.json")
+    resources:
+        **RESOURCES
+    run:
+        check_owner(input.current)
+        Path(output.completed).write_text(json.dumps({"hash": BS_HASH, "status": "complete"}) + "\n")
 
 
 # ----------------------- Baysor resolution ----------------------- #
 
 rule sopa_resolve_baysor:
     input:
-        baysor_patch_outputs
+        completed=str(SEGMENT_DIR / f"patches/{{sample}}/baysorComplete_{BS_HASH}.json"),
+        current=str(SEGMENT_DIR / "patches/{sample}_baysor_current.json")
     output:
         sentinel=touch(
             str(
@@ -391,6 +441,10 @@ rule sopa_resolve_baysor:
             f"logs/{{sample}}_sopaResolve_{BS_MASK_KEY}_{BS_HASH}.log"
         )
     run:
+        check_owner(input.current)
+        if json.loads(Path(input.completed).read_text()) != {"hash": BS_HASH, "status": "complete"}:
+            raise ValueError("Baysor patch completion record is invalid.")
+        
         zarr = Path(params.zarr)
 
         command = [
@@ -423,7 +477,8 @@ rule sopa_register_mask:
         sentinel=str(
             SEGMENT_DIR /
             f"patches/{{sample}}/baysorResolve_{BS_MASK_KEY}_{BS_HASH}.sentinel"
-        )
+        ),
+        current=str(SEGMENT_DIR / "patches/{sample}_baysor_current.json")
     output:
         sentinel=touch(
             str(
@@ -446,8 +501,8 @@ rule sopa_register_mask:
             f"logs/{{sample}}_sopaRegister_baysor_{BS_HASH}.log"
         )
     run:
-        import sys
-
+        check_owner(input.current)
+        
         command = [
             sys.executable,
             "-m", "spatialhub.scripts.sopaRegisterMask",
