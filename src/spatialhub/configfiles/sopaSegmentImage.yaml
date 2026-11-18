@@ -1,7 +1,7 @@
 resources:
     account: slurm_account
-    threads: 2
-    mem_mb: 128000
+    threads: 8
+    mem_mb: 64000
     time: "30:00:00"
     partition: "short"
 

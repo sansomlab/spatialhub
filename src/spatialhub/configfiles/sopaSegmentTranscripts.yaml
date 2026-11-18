@@ -1,7 +1,7 @@
 resources:
     account: slurm_account
-    threads: 2
-    mem_mb: 128000
+    threads: 8
+    mem_mb: 64000
     time: "30:00:00"
     partition: "short"
 
@@ -42,7 +42,7 @@ bs_config:
         min_molecules_per_segment: 3
         confidence_nn_id: 6
     segmentation:
-        scale: 80        # typical cell radius in microns (IMPORTANT)
+        scale: 80        # typical cell radius in 'global' coordinates system (IMPORTANT)
         scale_std: "25%" # cell radius standard deviation
         prior_segmentation_confidence: 0.5
         estimate_scale_from_centers: False
