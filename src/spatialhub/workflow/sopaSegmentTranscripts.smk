@@ -20,7 +20,6 @@ Stages:
 from pathlib import Path
 import hashlib
 import json
-import shlex
 import subprocess
 import sys
 
@@ -135,37 +134,38 @@ rule segment_setup:
         original_zarr=input_zarr,
         zarr=segment_zarr,
         mode="transcripts",
-        image=(
-            f"--image {shlex.quote(str(config['image_key']))}"
-            if config.get("image_key")
-            else ""
-        ),
-        points=(
-            f"--points {shlex.quote(str(config['points_key']))}"
-            if config.get("points_key")
-            else ""
-        ),
-        prior=(
-            f"--prior {shlex.quote(str(config['prior_segment_key']))}"
-            if config.get("prior_segment_key")
-            else ""
-        ),
+        image_key=config.get("image_key"),
+        points_key=config.get("points_key"),
+        prior_key=config.get("prior_segment_key"),
     resources:
         **RESOURCES,
     log:
         str(SEGMENT_DIR / "logs/{sample}_sopa_segmentSetup.log")
-    shell:
-        """
-        python -m spatialhub.scripts.sopaSegmentSetup \
-            --input-zarr {params.original_zarr:q} \
-            --output-zarr {params.zarr:q} \
-            --segmentation-mode {params.mode} \
-            {params.image} \
-            {params.points} \
-            {params.prior} \
-            --overwrite \
-            > {log:q} 2>&1
-        """
+    run:
+        command = [
+            sys.executable,
+            "-m", "spatialhub.scripts.sopaSegmentSetup",
+            "--input-zarr", params.original_zarr,
+            "--output-zarr", params.zarr,
+            "--segmentation-mode", params.mode,
+            "--overwrite",
+        ]
+
+        for option, value in (
+            ("--image", params.image_key),
+            ("--points", params.points_key),
+            ("--prior", params.prior_key),
+        ):
+            if value:
+                command.extend([option, str(value)])
+
+        with open(log[0], "w") as handle:
+            subprocess.run(
+                command,
+                stdout=handle,
+                stderr=subprocess.STDOUT,
+                check=True,
+            )
 
 
 # ----------------------- Transcripts patching ----------------------- #

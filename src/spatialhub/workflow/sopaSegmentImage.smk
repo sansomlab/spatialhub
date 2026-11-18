@@ -203,10 +203,11 @@ for method, settings in REGISTRATION.items():
     TARGETS += expand(
         str(
             SEGMENT_DIR /
-            "logs/{sample}_sopaRegister_{method}_{hash}.sentinel"
+            "logs/{sample}_sopaRegister_{method}_{mask_key}_{hash}.sentinel"
         ),
         sample=SAMPLE_IDS,
         method=method,
+        mask_key=settings["mask_key"],
         hash=settings["hash"],
     )
 
@@ -545,7 +546,7 @@ rule sopa_resolve_image:
     log:
         str(
             SEGMENT_DIR /
-            "logs/{sample}_sopaResolve_{mask_key}_{hash}.log"
+            "logs/{sample}_sopaResolve_{method}_{mask_key}_{hash}.log"
         )
     run:
         settings = params.settings
@@ -583,7 +584,7 @@ rule sopa_resolve_image:
 
 # ----------------------- Registration to source zarr ----------------------- #
 
-def registration_source(wildcards):
+def registration_source(wc):
     settings = image_settings(wc)
 
     return str(
@@ -602,7 +603,7 @@ rule sopa_register_mask:
         sentinel=touch(
             str(
                 SEGMENT_DIR /
-                "logs/{sample}_sopaRegister_{method}_{hash}.sentinel"
+                "logs/{sample}_sopaRegister_{method}_{mask_key}_{hash}.sentinel"
             )
         )
     params:
@@ -620,7 +621,7 @@ rule sopa_register_mask:
     log:
         str(
             SEGMENT_DIR /
-            "logs/{sample}_sopaRegister_{method}_{hash}.log"
+            "logs/{sample}_sopaRegister_{method}_{mask_key}_{hash}.log"
         )
     run:
         check_owner(
