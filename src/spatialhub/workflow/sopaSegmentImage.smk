@@ -1,6 +1,6 @@
 
 """
-Image-based cell or nucleus segmentation using SOPA (Cellpose or StarDist).
+Image-based cell or nucleus segmentation using SOPA (CellPose or StarDist).
 
 Input:
     Existing SpatialData Zarr stores.
@@ -12,12 +12,12 @@ Output:
 Stages:
     1. Create reduced segmentation Zarr.
     2. Generate SOPA image patches.
-    3. Run Cellpose and/or StarDist segmentation per patch.
+    3. Run CellPose and/or StarDist segmentation per patch.
     4. Resolve segmentation boundaries (using SOPA).
     5. Register segmentation mask (shapes) to original Zarr store.
 
 NOTE (beta):
-    Do not run Cellpose and StarDist simultaneously on the same
+    Do not run CellPose and StarDist simultaneously on the same
     SpatialData Zarr. Concurrent writes are not yet protected.
 """
 
@@ -27,6 +27,9 @@ import re
 import subprocess
 import hashlib
 import json
+import sys
+
+import spatialdata as spd
 
 
 # ----------------------- Global configuration ----------------------- #
@@ -45,7 +48,7 @@ RUN_STARDIST = config.get("run_stardist", False)
 # For beta release only!
 if RUN_CELLPOSE and RUN_STARDIST:
     raise ValueError(
-        "Running Cellpose and StarDist together is not supported "
+        "Running CellPose and StarDist together is not supported "
         "in the beta release. Enable only one method."
     )
 
@@ -53,8 +56,16 @@ if RUN_CELLPOSE and RUN_STARDIST:
 PATCH_WIDTH = config["img_patch_width"]
 PATCH_OVERLAP = config["img_patch_ovlp"]
 
+def check_owner(path, method_hash):
+    actual = json.loads(Path(path).read_text()).get("hash")
+    if actual != method_hash:
+        raise RuntimeError(
+            f"Patch cache belongs to {actual}, not {method_hash}. "
+            "Rerun segmentation with the intended configuration."
+        )
 
-# ----------------------- Cellpose configuration ----------------------- #
+
+# ----------------------- CellPose configuration ----------------------- #
 
 if RUN_CELLPOSE:
 
@@ -84,7 +95,7 @@ if RUN_CELLPOSE:
         channels = [str(c).strip() for c in channels]
 
         if not channels or any(not c for c in channels):
-            raise ValueError("Invalid Cellpose channels.")
+            raise ValueError("Invalid CellPose channels.")
 
         return " ".join(
             f"--channels {shlex.quote(c)}"
@@ -92,7 +103,7 @@ if RUN_CELLPOSE:
         )
 
 
-# ----------------------- Stardist configuration ----------------------- #
+# ----------------------- StarDist configuration ----------------------- #
 
 if RUN_STARDIST:
 
@@ -172,6 +183,8 @@ if RUN_CELLPOSE:
         "source_key": "cellpose_boundaries",
         "mask_key": CP_MASK_KEY,
         "hash": CP_HASH,
+        "cache": CP_CACHE,
+        "parameters": CP_PARAMS
     }
 
 if RUN_STARDIST:
@@ -179,6 +192,8 @@ if RUN_STARDIST:
         "source_key": "stardist_boundaries",
         "mask_key": SD_MASK_KEY,
         "hash": SD_HASH,
+        "cache": SD_CACHE,
+        "parameters": SD_PARAMS
     }
 
 
@@ -302,6 +317,15 @@ checkpoint sopa_image_patch:
 
 # ----------------------- Patch output parsing ----------------------- #
 
+def image_settings(wc):
+    settings = REGISTRATION[wc.method]
+
+    for key in ("hash", "mask_key"):
+        if getattr(wc, key, settings[key]) != settings[key]:
+            raise ValueError(f"Invalid {key} for {wc.method}")
+
+    return settings
+
 def get_patch_count(wildcards):
     ckpt = checkpoints.sopa_image_patch.get(
         sample=wildcards.sample
@@ -317,32 +341,39 @@ def get_patch_count(wildcards):
 
     return n_patches
 
+def image_patch_outputs(wc):
+    settings = image_settings(wc)
 
-if RUN_CELLPOSE:
-    def cellpose_patch_outputs(wildcards):
-        return expand(
-            str(
-                SEGMENT_DIR /
-                f"{{sample}}.zarr/.sopa_cache/{CP_CACHE}/{{patch}}.parquet"
-            ),
-            sample=wildcards.sample,
-            patch=range(get_patch_count(wildcards)),
+    return expand(
+        str(
+            SEGMENT_DIR /
+            f"{wc.sample}.zarr/.sopa_cache/{settings['cache']}/{{patch}}.parquet"
+        ),
+        patch=range(get_patch_count(wc)),
+    )
+
+
+# Track the active configuration to invalidate stale resolution and registration
+rule track_image:
+    input:
+        str(SEGMENT_DIR / "patches/{sample}_image.count")
+    output:
+        current=str(
+            SEGMENT_DIR / "patches/{sample}_{method}_current.json"
+        )
+    params:
+        hash=lambda wc: image_settings(wc)["hash"]
+    wildcard_constraints:
+        method="cellpose|stardist"
+    resources:
+        **RESOURCES
+    run:
+        Path(output.current).write_text(
+            json.dumps({"hash": params.hash}) + "\n"
         )
 
 
-if RUN_STARDIST:
-    def stardist_patch_outputs(wildcards):
-        return expand(
-            str(
-                SEGMENT_DIR /
-                f"{{sample}}.zarr/.sopa_cache/{SD_CACHE}/{{patch}}.parquet"
-            ),
-            sample=wildcards.sample,
-            patch=range(get_patch_count(wildcards)),
-        )
-
-
-# ----------------------- Cellpose segmentation ----------------------- #
+# ----------------------- CellPose segmentation ----------------------- #
 
 if RUN_CELLPOSE:
 
@@ -401,7 +432,7 @@ if RUN_CELLPOSE:
 # ----------------------- StarDist segmentation ----------------------- #
 
 if RUN_STARDIST:
-
+    
     rule sopa_segment_stardist:
         input:
             str(SEGMENT_DIR / "patches/{sample}_image.count")
@@ -452,96 +483,121 @@ if RUN_STARDIST:
             """
 
 
-# ----------------------- Cellpose resolution ----------------------- #
+# ----------------------- Image-based mask resolution ----------------------- #
 
-if RUN_CELLPOSE:
+rule image_completion:
+    input:
+        patches=image_patch_outputs,
+        current=str(
+            SEGMENT_DIR / "patches/{sample}_{method}_current.json"
+        )
+    output:
+        completed=str(
+            SEGMENT_DIR /
+            "configs/{sample}/{method}Complete_{hash}.json"
+        )
+    params:
+        settings=image_settings
+    wildcard_constraints:
+        method="cellpose|stardist",
+        hash=r"[0-9a-f]{12}"
+    resources:
+        **RESOURCES
+    run:
+        settings = params.settings
+        check_owner(input.current, settings["hash"])
 
-    rule sopa_resolve_cellpose:
-        input:
-            cellpose_patch_outputs
-        output:
-            sentinel=touch(
-                str(
-                    SEGMENT_DIR /
-                    f"patches/{{sample}}/cellposeResolve_{CP_MASK_KEY}_{CP_HASH}.sentinel"
-                )
-            ),
-        params:
-            zarr=segment_zarr,
-            cache=CP_CACHE,
-        resources:
-            **RESOURCES
-        log:
+        state = {
+            "hash": settings["hash"],
+            "status": "complete",
+            "parameters": settings["parameters"],
+        }
+
+        Path(output.completed).write_text(
+            json.dumps(state, indent=2, sort_keys=True) + "\n"
+        )
+
+
+rule sopa_resolve_image:
+    input:
+        completed=str(
+            SEGMENT_DIR /
+            "configs/{sample}/{method}Complete_{hash}.json"
+        ),
+        current=str(
+            SEGMENT_DIR / "patches/{sample}_{method}_current.json"
+        )
+    output:
+        sentinel=touch(
             str(
                 SEGMENT_DIR /
-                f"logs/{{sample}}_sopaResolve_{CP_MASK_KEY}_{CP_HASH}.log"
+                "patches/{sample}/{method}Resolve_{mask_key}_{hash}.sentinel"
             )
-        shell:
-            """
-            sopa resolve cellpose {params.zarr:q} \
-                --cache-dir-name {params.cache:q} \
-                > {log:q} 2>&1
-            """
+        )
+    params:
+        zarr=segment_zarr,
+        settings=image_settings
+    wildcard_constraints:
+        method="cellpose|stardist",
+        hash=r"[0-9a-f]{12}"
+    resources:
+        **RESOURCES
+    log:
+        str(
+            SEGMENT_DIR /
+            "logs/{sample}_sopaResolve_{mask_key}_{hash}.log"
+        )
+    run:
+        settings = params.settings
+        check_owner(input.current, settings["hash"])
 
+        completion = json.loads(Path(input.completed).read_text())
 
-# ----------------------- StarDist resolution ----------------------- #
+        if completion != {
+            "hash": settings["hash"],
+            "status": "complete",
+            "parameters": settings["parameters"],
+        }:
+            raise ValueError("Image segmentation completion record is invalid.")
 
-if RUN_STARDIST:
+        command = [
+            "sopa", "resolve", wildcards.method, params.zarr,
+            "--cache-dir-name", settings["cache"],
+        ]
 
-    rule sopa_resolve_stardist:
-        input:
-            stardist_patch_outputs
-        output:
-            sentinel=touch(
-                str(
-                    SEGMENT_DIR /
-                    f"patches/{{sample}}/stardistResolve_{SD_MASK_KEY}_{SD_HASH}.sentinel"
-                )
-            ),
-        params:
-            zarr=segment_zarr,
-            cache=SD_CACHE,
-        resources:
-            **RESOURCES
-        log:
-            str(
-                SEGMENT_DIR /
-                f"logs/{{sample}}_sopaResolve_{SD_MASK_KEY}_{SD_HASH}.log"
+        with open(log[0], "w") as handle:
+            subprocess.run(
+                command,
+                stdout=handle,
+                stderr=subprocess.STDOUT,
+                check=True,
             )
-        shell:
-            """
-            sopa resolve stardist {params.zarr:q} \
-                --cache-dir-name {params.cache:q} \
-                > {log:q} 2>&1
-            """
+
+        sdata = spd.read_zarr(params.zarr)
+
+        if settings["source_key"] not in sdata.shapes:
+            raise RuntimeError(
+                f"Resolution did not produce '{settings['source_key']}'."
+            )
 
 
 # ----------------------- Registration to source zarr ----------------------- #
 
 def registration_source(wildcards):
-    method = wildcards.method
-
-    if method not in REGISTRATION:
-        raise ValueError(f"Unknown segmentation method: {method}")
-
-    expected_hash = REGISTRATION[method]["hash"]
-
-    if wildcards.hash != expected_hash:
-        raise ValueError(
-            f"Configuration hash mismatch for {method}: "
-            f"{wildcards.hash} != {expected_hash}"
-        )
+    settings = image_settings(wc)
 
     return str(
         SEGMENT_DIR /
-        f"patches/{wildcards.sample}/"
-        f"{method}Resolve_{REGISTRATION[method]['mask_key']}_{expected_hash}.sentinel"
+        f"patches/{wc.sample}/{wc.method}Resolve_"
+        f"{settings['mask_key']}_{settings['hash']}.sentinel"
     )
-
 
 rule sopa_register_mask:
     input:
-        sentinel=registration_source
+        sentinel=registration_source,
+        current=str(
+            SEGMENT_DIR / "patches/{sample}_{method}_current.json"
+        )
     output:
         sentinel=touch(
             str(
@@ -567,8 +623,11 @@ rule sopa_register_mask:
             "logs/{sample}_sopaRegister_{method}_{hash}.log"
         )
     run:
-        import sys
-
+        check_owner(
+            input.current,
+            REGISTRATION[wildcards.method]["hash"],
+        )
+        
         command = [
             sys.executable,
             "-m", "spatialhub.scripts.sopaRegisterMask",

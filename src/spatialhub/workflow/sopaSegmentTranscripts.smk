@@ -473,6 +473,7 @@ rule sopa_resolve_baysor:
         command = [
             "sopa", "resolve", "baysor", str(zarr),
             "--gene-column", params.gene,
+            "--min-area", str(config["bs_cell_area"]),
         ]
 
         with open(log[0], "w") as handle:

@@ -24,7 +24,7 @@ image_key: 'image'
 # Segmentation to run
 # cannot run both simultaneously in beta release
 run_cellpose: true
-run_stardist: true
+run_stardist: false
 
 # SOPA patching
 img_patch_width: 2000

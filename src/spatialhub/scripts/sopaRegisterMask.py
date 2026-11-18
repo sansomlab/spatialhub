@@ -62,15 +62,10 @@ def main():
                 f"Element '{args.mask_key}' already exists. "
                 "Use --overwrite to replace it."
             )
-
         if args.mask_key not in sdata_original.shapes:
             raise ValueError(
                 f"Element '{args.mask_key}' exists but is not a shapes element."
             )
-
-        print(f"Overwriting existing segmentation: {args.mask_key}")
-        sdata_original.delete_element_from_disk(args.mask_key)
-        del sdata_original[args.mask_key]
 
     if 'image' not in sdata_seg.images:
         raise KeyError(
@@ -138,9 +133,18 @@ def main():
         )
 
     n_cells = len(segmentation)
+    if n_cells == 0:
+        raise ValueError(
+            "Segmentation contains no cells."
+        )
+
+    # Now that we've validated the segmentation, we can safely remove the pre-existing mask if overwrite is enabled.
+    if args.mask_key in sdata_original: 
+        print(f"Overwriting existing segmentation: {args.mask_key}")
+        sdata_original.delete_element_from_disk(args.mask_key)
+        del sdata_original[args.mask_key]
 
     print(f"Registering {n_cells} cells as '{args.mask_key}'")
-
     sdata_original[args.mask_key] = segmentation
     sdata_original.write_element(args.mask_key)
 
