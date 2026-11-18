@@ -409,20 +409,37 @@ rule record_completion:
         patches=baysor_patch_outputs,
         current=str(SEGMENT_DIR / "patches/{sample}_baysor_current.json")
     output:
-        completed=str(SEGMENT_DIR / f"patches/{{sample}}/baysorComplete_{BS_HASH}.json")
+        completed=str(
+            SEGMENT_DIR /
+            f"configs/{{sample}}/baysorComplete_{BS_HASH}.json"
+        )
     resources:
         **RESOURCES
     run:
         check_owner(input.current)
-        Path(output.completed).write_text(json.dumps({"hash": BS_HASH, "status": "complete"}) + "\n")
+        
+        state = {
+            "hash": BS_HASH,
+            "status": "complete",
+            "parameters": BS_PARAMS,
+        }
+
+        Path(output.completed).write_text(
+            json.dumps(state, indent=2, sort_keys=True) + "\n"
+        )
 
 
 # ----------------------- Baysor resolution ----------------------- #
 
 rule sopa_resolve_baysor:
     input:
-        completed=str(SEGMENT_DIR / f"patches/{{sample}}/baysorComplete_{BS_HASH}.json"),
-        current=str(SEGMENT_DIR / "patches/{sample}_baysor_current.json")
+        completed=str(
+            SEGMENT_DIR /
+            f"configs/{{sample}}/baysorComplete_{BS_HASH}.json"
+        ),
+        current=str(
+            SEGMENT_DIR / "patches/{sample}_baysor_current.json"
+        )
     output:
         sentinel=touch(
             str(
@@ -442,7 +459,13 @@ rule sopa_resolve_baysor:
         )
     run:
         check_owner(input.current)
-        if json.loads(Path(input.completed).read_text()) != {"hash": BS_HASH, "status": "complete"}:
+        
+        completion = json.loads(Path(input.completed).read_text())
+        if (
+            completion.get("hash") != BS_HASH
+            or completion.get("status") != "complete"
+            or completion.get("parameters") != BS_PARAMS
+        ):
             raise ValueError("Baysor patch completion record is invalid.")
         
         zarr = Path(params.zarr)
