@@ -76,8 +76,7 @@ if RUN_CELLPOSE:
         "patch_width": PATCH_WIDTH,
         "patch_overlap": PATCH_OVERLAP,
         "cellpose_config": CP_CONFIG,
-        "cell_area": config["cp_cell_area"],
-        "mask_key": CP_MASK_KEY,
+        "cell_area": config["cp_cell_area"]
     }
 
     CP_HASH = hashlib.sha256(
@@ -119,8 +118,7 @@ if RUN_STARDIST:
         "patch_width": PATCH_WIDTH,
         "patch_overlap": PATCH_OVERLAP,
         "stardist_config": SD_CONFIG,
-        "nucleus_area": config["sd_nucleus_area"],
-        "mask_key": SD_MASK_KEY,
+        "nucleus_area": config["sd_nucleus_area"]
     }
 
     SD_HASH = hashlib.sha256(
@@ -203,7 +201,7 @@ for method, settings in REGISTRATION.items():
     TARGETS += expand(
         str(
             SEGMENT_DIR /
-            "logs/{sample}_sopaRegister_{method}_{mask_key}_{hash}.sentinel"
+            "logs/{sample}_{method}Register_{mask_key}_{hash}.sentinel"
         ),
         sample=SAMPLE_IDS,
         method=method,
@@ -221,8 +219,11 @@ if not TARGETS:
 rule full:
     input:
         TARGETS
+    threads: 1
     resources:
-        **RESOURCES
+        mem_mb=100,
+        time="00:01:00",
+        partition="short",
     shell:
         """
         echo "=======> All done! <======="
@@ -410,7 +411,7 @@ if RUN_CELLPOSE:
         log:
             str(
                 SEGMENT_DIR /
-                f"logs/{{sample}}_sopaSegment_{CP_MASK_KEY}_{CP_HASH}_{{patch}}.log"
+                f"logs/{{sample}}_sopaSegment_{CP_HASH}_{{patch}}.log"
             )
         shell:
             """
@@ -465,7 +466,7 @@ if RUN_STARDIST:
         log:
             str(
                 SEGMENT_DIR /
-                f"logs/{{sample}}_sopaSegment_{SD_MASK_KEY}_{SD_HASH}_{{patch}}.log"
+                f"logs/{{sample}}_sopaSegment_{SD_HASH}_{{patch}}.log"
             )
         shell:
             """
@@ -532,7 +533,7 @@ rule sopa_resolve_image:
         sentinel=touch(
             str(
                 SEGMENT_DIR /
-                "patches/{sample}/{method}Resolve_{mask_key}_{hash}.sentinel"
+                "patches/{sample}/{method}Resolve_{hash}.sentinel"
             )
         )
     params:
@@ -546,7 +547,7 @@ rule sopa_resolve_image:
     log:
         str(
             SEGMENT_DIR /
-            "logs/{sample}_sopaResolve_{method}_{mask_key}_{hash}.log"
+            "logs/{sample}_{method}Resolve_{hash}.log"
         )
     run:
         settings = params.settings
@@ -590,7 +591,7 @@ def registration_source(wc):
     return str(
         SEGMENT_DIR /
         f"patches/{wc.sample}/{wc.method}Resolve_"
-        f"{settings['mask_key']}_{settings['hash']}.sentinel"
+        f"{settings['hash']}.sentinel"
     )
 
 rule sopa_register_mask:
@@ -603,7 +604,7 @@ rule sopa_register_mask:
         sentinel=touch(
             str(
                 SEGMENT_DIR /
-                "logs/{sample}_sopaRegister_{method}_{mask_key}_{hash}.sentinel"
+                "logs/{sample}_{method}Register_{mask_key}_{hash}.sentinel"
             )
         )
     params:
@@ -621,7 +622,7 @@ rule sopa_register_mask:
     log:
         str(
             SEGMENT_DIR /
-            "logs/{sample}_sopaRegister_{method}_{mask_key}_{hash}.log"
+            "logs/{sample}_{method}Register_{mask_key}_{hash}.log"
         )
     run:
         check_owner(

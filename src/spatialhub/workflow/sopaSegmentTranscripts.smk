@@ -53,7 +53,7 @@ BS_PARAMS = {
     "prior": config.get("prior_segment_key"),
     "baysor_config": BS_CONFIG,
     "baysor_area": config["bs_cell_area"],
-    "mask_key": config["bs_mask_key"],
+    "gene_column": config["bs_gene_column"]
 }
 
 BS_HASH = hashlib.sha256(
@@ -111,12 +111,15 @@ rule full:
         expand(
             str(
                 SEGMENT_DIR /
-                f"logs/{{sample}}_sopaRegister_baysor_{BS_HASH}.sentinel"
+                f"logs/{{sample}}_baysorRegister_{BS_MASK_KEY}_{BS_HASH}.sentinel"
             ),
             sample=SAMPLE_IDS,
         )
+    threads: 1
     resources:
-        **RESOURCES,
+        mem_mb=100,
+        time="00:01:00",
+        partition="short",
     shell:
         """
         echo "=======> All done! <======="
@@ -323,7 +326,7 @@ def baysor_patch_outputs(wildcards):
     return expand(
         str(
             SEGMENT_DIR /
-            f"patches/{{sample}}/baysorSegment_{BS_MASK_KEY}_{BS_HASH}_{{patch}}.sentinel"
+            f"patches/{{sample}}/baysorSegment_{BS_HASH}_{{patch}}.sentinel"
         ),
         sample=wildcards.sample,
         patch=get_patch_indices(wildcards),
@@ -353,7 +356,7 @@ rule sopa_segment_baysor:
         current=str(SEGMENT_DIR / "patches/{sample}_baysor_current.json")
     output:
         sentinel=touch(
-            str(SEGMENT_DIR / f"patches/{{sample}}/baysorSegment_{BS_MASK_KEY}_{BS_HASH}_{{patch}}.sentinel")
+            str(SEGMENT_DIR / f"patches/{{sample}}/baysorSegment_{BS_HASH}_{{patch}}.sentinel")
         )
     params:
         zarr=segment_zarr,
@@ -372,7 +375,7 @@ rule sopa_segment_baysor:
     log:
         str(
             SEGMENT_DIR /
-            f"logs/{{sample}}_sopaSegment_{BS_MASK_KEY}_{BS_HASH}_{{patch}}.log"
+            f"logs/{{sample}}_sopaSegment_{BS_HASH}_{{patch}}.log"
         )
     shell:
         """
@@ -444,7 +447,7 @@ rule sopa_resolve_baysor:
         sentinel=touch(
             str(
                 SEGMENT_DIR /
-                f"patches/{{sample}}/baysorResolve_{BS_MASK_KEY}_{BS_HASH}.sentinel"
+                f"patches/{{sample}}/baysorResolve_{BS_HASH}.sentinel"
             )
         )
     params:
@@ -455,7 +458,7 @@ rule sopa_resolve_baysor:
     log:
         str(
             SEGMENT_DIR /
-            f"logs/{{sample}}_sopaResolve_{BS_MASK_KEY}_{BS_HASH}.log"
+            f"logs/{{sample}}_sopaResolve_{BS_HASH}.log"
         )
     run:
         check_owner(input.current)
@@ -500,14 +503,14 @@ rule sopa_register_mask:
     input:
         sentinel=str(
             SEGMENT_DIR /
-            f"patches/{{sample}}/baysorResolve_{BS_MASK_KEY}_{BS_HASH}.sentinel"
+            f"patches/{{sample}}/baysorResolve_{BS_HASH}.sentinel"
         ),
         current=str(SEGMENT_DIR / "patches/{sample}_baysor_current.json")
     output:
         sentinel=touch(
             str(
                 SEGMENT_DIR /
-                f"logs/{{sample}}_sopaRegister_baysor_{BS_HASH}.sentinel"
+                f"logs/{{sample}}_baysorRegister_{BS_MASK_KEY}_{BS_HASH}.sentinel"
             )
         )
     params:
@@ -522,7 +525,7 @@ rule sopa_register_mask:
     log:
         str(
             SEGMENT_DIR /
-            f"logs/{{sample}}_sopaRegister_baysor_{BS_HASH}.log"
+            f"logs/{{sample}}_baysorRegister_{BS_MASK_KEY}_{BS_HASH}.log"
         )
     run:
         check_owner(input.current)

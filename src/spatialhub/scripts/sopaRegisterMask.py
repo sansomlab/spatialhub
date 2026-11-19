@@ -60,7 +60,7 @@ def main():
         if not args.overwrite:
             raise FileExistsError(
                 f"Element '{args.mask_key}' already exists. "
-                "Use --overwrite to replace it."
+                "Use --overwrite to replace it, or update the provided mask key."
             )
         if args.mask_key not in sdata_original.shapes:
             raise ValueError(
