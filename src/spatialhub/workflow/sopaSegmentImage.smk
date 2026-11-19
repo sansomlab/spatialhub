@@ -219,11 +219,7 @@ if not TARGETS:
 rule full:
     input:
         TARGETS
-    threads: 1
-    resources:
-        mem_mb=100,
-        time="00:01:00",
-        partition="short",
+    localrule: True
     shell:
         """
         echo "=======> All done! <======="

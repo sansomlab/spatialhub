@@ -74,6 +74,11 @@ def main():
         "n_transcripts": counts,
     })
 
+    counts = counts.sort_values(
+        "n_transcripts",
+        ascending=False
+    )
+
     args.output.parent.mkdir(parents=True, exist_ok=True)
     result.to_csv(args.output, sep="\t", index=False)
 

@@ -116,11 +116,7 @@ rule full:
             ),
             sample=SAMPLE_IDS,
         )
-    threads: 1
-    resources:
-        mem_mb=100,
-        time="00:01:00",
-        partition="short",
+    localrule: True
     shell:
         """
         echo "=======> All done! <======="
@@ -310,6 +306,31 @@ rule validate_patch_transcripts:
         )
 
 
+def baysor_memory(wildcards):
+    counts_file = (
+        SEGMENT_DIR /
+        f"patches/{wildcards.sample}_transcriptCounts.tsv"
+    )
+
+    counts = pd.read_csv(counts_file, sep="\t")
+
+    n_transcripts = counts.loc[
+        counts["patch_index"] == int(wildcards.patch),
+        "n_transcripts"
+    ].iloc[0]
+
+    memory = (
+        config.get("bs_mem_base", 16000)
+        + config.get("bs_mem_per200k", 16000)
+        * n_transcripts / 200_000
+    )
+
+    return min(
+        int(memory),
+        int(config.get("bs_mem_max", 128000))
+    )
+
+
 def get_patch_indices(wildcards):
     ckpt = checkpoints.sopa_transcripts_patch.get(
         sample=wildcards.sample
@@ -372,7 +393,7 @@ rule sopa_segment_baysor:
     wildcard_constraints:
         patch=r"\d+"
     resources:
-        **RESOURCES,
+        **{**RESOURCES, "mem_mb": baysor_memory},
     log:
         str(
             SEGMENT_DIR /

@@ -29,6 +29,11 @@ tx_patch_ovlp: 200
 tx_min_transcripts: 5000  # minimum transcripts per patch to enable downstream segmentation
     # e.g. SOPA/baysor fails if there are <4000 transcripts in one patch (4000 set by SOPA developers)
 
+# Memory allocated per patch and per milion of transcripts (in MB). This is used to optimize the memory allocation for each patch.
+bs_mem_base: 16000  # initial patch memory allocation (e.g. 16G)
+bs_mem_per200k: 16000  # additional memory for each additional million transcripts (e.g. 16G per million transcripts)
+bs_mem_max: 128000  # maximum memory allocation per patch, regardless of transcript count (e.g. 128G)
+
 # Baysor
 bs_config:
     data:
