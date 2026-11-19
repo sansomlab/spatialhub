@@ -70,7 +70,6 @@ def check_owner(path, method_hash):
 if RUN_CELLPOSE:
 
     CP_CONFIG = config["cp_config"]
-    CP_MASK_KEY = config["cp_mask_key"]
 
     CP_PARAMS = {
         "patch_width": PATCH_WIDTH,
@@ -83,6 +82,7 @@ if RUN_CELLPOSE:
         json.dumps(CP_PARAMS, sort_keys=True).encode()
     ).hexdigest()[:12]
 
+    CP_MASK_KEY = config.get("cp_mask_key") or f"cellpose_{CP_HASH}"
     CP_CACHE = f"cellpose_{CP_HASH}"
 
     def cellpose_channels():
@@ -107,8 +107,7 @@ if RUN_CELLPOSE:
 if RUN_STARDIST:
 
     SD_CONFIG = config["sd_config"]
-    SD_MASK_KEY = config["sd_mask_key"]
-
+    
     if not Path(SD_CONFIG["model_path"]).is_dir():
         raise FileNotFoundError(
             f"StarDist model not found: {SD_CONFIG['model_path']}"
@@ -125,6 +124,7 @@ if RUN_STARDIST:
         json.dumps(SD_PARAMS, sort_keys=True).encode()
     ).hexdigest()[:12]
 
+    SD_MASK_KEY = config.get("sd_mask_key") or f"stardist_{SD_HASH}"
     SD_CACHE = f"stardist_{SD_HASH}"
 
 

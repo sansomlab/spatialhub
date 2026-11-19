@@ -54,5 +54,8 @@ bs_config:
 bs_cell_area: 100
 bs_gene_column: "target"
 
-# Segmentation shape key
-bs_mask_key: "baysor"
+# Optional destination mask name.
+# Leave blank to use baysor_<configuration_hash>.
+# An explicit name overrides the default.
+# Changing this value does not rerun segmentation - only registration to the original zarr.
+bs_mask_key:

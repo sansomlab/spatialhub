@@ -45,7 +45,6 @@ PATCH_OVERLAP = config["tx_patch_ovlp"]
 # ----------------------- Baysor configuration ----------------------- #
 
 BS_CONFIG = config["bs_config"]
-BS_MASK_KEY = config["bs_mask_key"]
 
 BS_PARAMS = {
     "patch_width": PATCH_WIDTH,
@@ -59,6 +58,8 @@ BS_PARAMS = {
 BS_HASH = hashlib.sha256(
     json.dumps(BS_PARAMS, sort_keys=True).encode()
 ).hexdigest()[:12]
+
+BS_MASK_KEY = config.get("bs_mask_key") or f"baysor_{BS_HASH}"
 
 
 # ----------------------- Sample selection ----------------------- #

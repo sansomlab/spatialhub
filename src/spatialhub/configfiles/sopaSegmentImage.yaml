@@ -41,7 +41,6 @@ cp_config:
     gaussian_sigma: 1.0
     clahe_kernel_size:  # leave blank if not using CLAHE
 cp_cell_area: 100  # post-hoc SOPA filtering
-cp_mask_key: "cellpose_cpsam2"
 
 # Stardist configuration
 sd_config:
@@ -53,4 +52,10 @@ sd_config:
     gaussian_sigma: 1.0
     clahe_kernel_size:  # leave blank if not using CLAHE
 sd_nucleus_area: 30  # post-hoc SOPA filtering
-sd_mask_key: "stardist_fluo"
+
+# Optional destination mask name.
+# Leave blank to use <method>_<configuration_hash>.
+# An explicit name overrides the default.
+# Changing this value does not rerun segmentation - only registration to the original zarr.
+cp_mask_key:
+sd_mask_key:
