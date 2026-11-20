@@ -1,0 +1,61 @@
+resources:
+    account: slurm_account
+    threads: 8
+    mem_mb: 64000
+    time: "30:00:00"
+    partition: "short"
+
+
+# Input SpatialData Zarr directory
+zarr_dir: "spatialdata.dir"
+
+# Optional explicit sample selection (for example, to pilot segmentation on a subset of samples)
+# Set to null to discover all .zarr directories.
+sample_ids: null
+
+# Output segmentation directory
+segment_dir: "sopa.segment.dir"
+overwrite_mask: false  # whether to overwrite existing segmentation masks in the output directory if using the same mask_key
+
+# Image from input SpatialData object to draw from for segmentation
+# This should be in GLOBAL coordinates system (necessary for successful registration)
+image_key: 'image'
+
+# Segmentation to run
+# cannot run both simultaneously in beta release
+run_cellpose: true
+run_stardist: false
+
+# SOPA patching
+img_patch_width: 2000
+img_patch_ovlp: 100
+
+# Cellpose configuration
+cp_config:
+    model: "cpsam_2"
+    channels: ['DNA', 'Membrane']
+    cell_diameter: 30
+    flow_thresh: 0.4
+    prob_thresh: 0.0
+    clip_limit: 0.2
+    gaussian_sigma: 1.0
+    clahe_kernel_size:  # leave blank if not using CLAHE
+cp_cell_area: 100  # post-hoc SOPA filtering
+
+# Stardist configuration
+sd_config:
+    model_path: "/gpfs3/well/sansom/users/tme871/.keras/models/StarDist2D/2D_versatile_fluo" # use full path
+    channels: 'DNA'
+    prob_thresh: 0.2
+    nms_thresh: 0.6
+    clip_limit: 0.2
+    gaussian_sigma: 1.0
+    clahe_kernel_size:  # leave blank if not using CLAHE
+sd_nucleus_area: 30  # post-hoc SOPA filtering
+
+# Optional destination mask name.
+# Leave blank to use <method>_<configuration_hash>.
+# An explicit name overrides the default.
+# Changing this value does not rerun segmentation - only registration to the original zarr.
+cp_mask_key:
+sd_mask_key:

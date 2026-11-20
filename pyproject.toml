@@ -20,9 +20,9 @@ dependencies = [
     "spatialdata-io",
     "spatialdata-plot",
     "rctd-py",
-    "sopa[cellpose]",
     "ipykernel",
     "rich-argparse",
+    "sopa[cellpose,stardist,baysor]"
 ]
 requires-python = ">=3.12"
 readme = "README.md"
