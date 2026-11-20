@@ -80,7 +80,7 @@ WORKFLOWS = {
         "summary": "Deconvolve cell-type abundances against a single-cell reference "
         "using RCTD.",
         "steps": [],
-        "executor": "drmaa",
+        "executor": "slurm-drmaa",
     },
     "runCell2Location": {
         "summary": "Deconvolve cell-type abundances against a single-cell reference "

@@ -12,9 +12,18 @@ if "lock" in config:
 else:
     LOCK = "false"
 
-RESOURCES = {"threads": 4, "mem_mb": 16000, "time": "04:00:00", "partition": "short"}
+RESOURCES = {"threads": 2, "mem_mb": 16000, "runtime": 60, "slurm_partition": "short"}
 RESOURCES.update(config.get("resources", {}))
+THREADS = RESOURCES.pop("threads")
 
+# GPU resources: start from the base, then apply any overrides from the
+# gpu_resources block (partition, account, threads, memory, runtime, ...).
+# n_gpus becomes the gres request unless a full gres string is given.
+_gpu_cfg = dict(config.get("gpu_resources", {}))
+_n_gpus = _gpu_cfg.pop("n_gpus", 1)
+GPU_THREADS = _gpu_cfg.pop("threads", THREADS)
+GPU_RESOURCES = {**RESOURCES, **_gpu_cfg}
+GPU_RESOURCES.setdefault("gres", f"gpu:{_n_gpus}")
 
 task_dict = config["tasks"]
 
@@ -44,8 +53,9 @@ rule run_rctd:
         os.path.join(config["outdir"], "{task}.rctd.pkl"),
     log:
         os.path.join(config["outdir"], "{task}.rctd.log"),
+    threads: GPU_THREADS
     resources:
-        **RESOURCES,
+        **GPU_RESOURCES,
     params:
         celltype=lambda wc: task_dict[wc.task]["celltype"],
         mode=config.get("mode", "full"),

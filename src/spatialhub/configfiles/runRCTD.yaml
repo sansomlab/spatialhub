@@ -1,9 +1,18 @@
 resources:
-    account: slurm_account
+    slurm_account: slurm_account
     threads: 2
-    mem_mb: 32000
-    time: "4:00:00"
-    partition: "short"
+    mem_mb: 128000
+    runtime: 240
+    slurm_partition: "long"
+
+# Resources for GPU rules (Cellpose). Any key here overrides the value above.
+gpu_resources:
+    slurm_account: slurm_gpu_account
+    threads: 2
+    mem_mb: 96000
+    runtime: 1440 # minutes; must fit the partition's MaxTime
+    n_gpus: 1 # requested as gres gpu:<n_gpus>
+    slurm_partition: gpu_partition
 
 outdir: /path/to/rctd/output/folder/
 mode: full # options: full|doublet|multi
